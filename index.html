@@ -234,6 +234,25 @@ body.is-admin div.admin-only{display:flex !important}
         <div class="pair-box"><b>Bowler order</b><br><span class="muted">Automatically sorted lowest average to highest.</span></div>
         <div class="pair-box"><b>Handicap Caps</b><br><span class="muted">210 − average, minimum 0.<br>Max <b>40</b> for Female/Female Senior.<br>Max <b>35</b> for Male/Male Senior.</span></div>
       </div>
+      
+      <!-- TESTING MODULE -->
+      <div class="card span12 admin-only" style="border-color: var(--ok); background: rgba(32, 224, 112, 0.05);">
+        <h3 style="color: var(--ok)">🧪 Testing Environment</h3>
+        <div class="row" style="align-items:end;">
+          <div>
+            <label for="dummyCount" style="color:var(--ok)">Generate Random Teams</label>
+            <input id="dummyCount" type="number" min="1" max="90" value="30" style="border-color:var(--ok);">
+          </div>
+          <div>
+            <button class="btn-primary" style="background:var(--ok);color:#000;width:100%" onclick="generateDummyTeams()">Generate Dummy Teams</button>
+          </div>
+          <div class="muted small" style="flex: 2 1 300px;">
+            Generates 1 to 90 teams automatically.<br>
+            Players will be assigned averages (175 - 210) and genders based on logic (80% Male, 15% Male Senior, 5% Female).
+          </div>
+        </div>
+      </div>
+
       <div class="card span12">
         <div class="actions" style="justify-content:space-between"><h3 style="margin:0">Registered Teams</h3><span id="teamCountBadge" class="badge">0 teams</span></div>
         <div id="teamsTable"></div>
@@ -396,6 +415,48 @@ function registerTeam(){
 }
 function showTeamAlert(msg,type){document.getElementById('teamAlert').innerHTML=`<div class="alert alert-${type==='danger'?'danger':'ok'}">${esc(msg)}</div>`}
 
+/* ----- TEST DATA GENERATOR ----- */
+function generateDummyTeams(){
+  if(!isAdmin) return;
+  const count = parseInt(document.getElementById('dummyCount').value);
+  if(isNaN(count) || count < 1 || count > 90) { alert('Please select a number of teams between 1 and 90.'); return; }
+  
+  let tCounter = state.teams.length + 1;
+  let pCounter = (state.teams.length * 3) + 1;
+
+  for(let i=0; i<count; i++){
+    let teamName = `Team${tCounter++}`;
+    let bowlers = [];
+    
+    for(let b=0; b<3; b++){
+      let playerName = `Player${pCounter++}`;
+      // Random average between 175 and 210
+      let avg = Math.floor(Math.random() * (210 - 175 + 1)) + 175;
+      
+      // Demographics Ratio: 80% Male, 15% Male Senior, 5% Female
+      let rand = Math.random();
+      let gender = 'Male';
+      if(rand >= 0.95) {
+        gender = 'Female';
+      } else if (rand >= 0.80) {
+        gender = 'Male Senior';
+      }
+      
+      bowlers.push({ name: playerName, average: avg, gender: gender });
+    }
+    
+    // Sort logic just like manual registration
+    let sorted = bowlers.sort((a,b) => a.average - b.average);
+    sorted.forEach((bowler, idx) => bowler.handicap = handicap(bowler.average, bowler.gender));
+    
+    state.teams.push({id: crypto.randomUUID(), name: teamName, contact: 'Auto-Gen', bowlers: sorted});
+  }
+  
+  save();
+  alert(`Successfully generated ${count} dummy teams!`);
+}
+/* ------------------------------- */
+
 function renderTeams(){
   const holder=document.getElementById('teamsTable');
   document.getElementById('teamCountBadge').textContent=`${state.teams.length} team${state.teams.length===1?'':'s'}`;
@@ -460,9 +521,16 @@ function renderGame(){
   const game=state.games.find(g=>g.number===state.currentGame);
   if(!game){ el.innerHTML=`<div class="card"><div class="empty">No active game.</div></div>`;return}
   const map=teamMap();
-  el.innerHTML=`<div class="card"><div class="actions" style="justify-content:space-between"><div><h2>Game ${game.number} — ${game.day}</h2><div class="muted">Starting lane: <b>${game.startLane}</b> • ${game.matches.length} match${game.matches.length===1?'':'es'}</div></div><div class="badge">${game.matches.filter(m=>m.completed).length}/${game.matches.length} matches complete</div></div></div>${
+  el.innerHTML=`<div class="card"><div class="actions" style="justify-content:space-between">
+      <div><h2>Game ${game.number} — ${game.day}</h2><div class="muted">Starting lane: <b>${game.startLane}</b> • ${game.matches.length} match${game.matches.length===1?'':'es'}</div></div>
+      <div class="actions">
+        <button class="btn-secondary" style="border-color:var(--ok);color:var(--ok);" onclick="generateRandomScores()">🎲 Randomize All Scores</button>
+        <div class="badge">${game.matches.filter(m=>m.completed).length}/${game.matches.length} matches complete</div>
+      </div>
+    </div></div>${
     game.matches.map((m,mi)=>renderMatch(m,mi,map)).join('')
   }<div class="card"><div class="actions" style="justify-content:space-between"><div class="muted">Scores are entered for each matchup and full team score.</div><button class="btn-primary" id="finishGameBtn" ${game.matches.some(m=>!m.completed)?'disabled':''}>${game.number<totalGames?'Finish Game & Generate Next Positions Round':'Finish Tournament'}</button></div></div>`;
+  
   if(document.getElementById('finishGameBtn')){
     document.getElementById('finishGameBtn').onclick=finishCurrentGame;
   }
@@ -488,6 +556,23 @@ function renderMatch(m,mi,map){
     <div class="actions" style="justify-content:flex-end;margin-top:10px">${canEdit?`<button class="btn-primary" onclick="saveMatch('${m.id}')">Save Match</button>`:''}</div>
   </div></div>`;
 }
+
+/* ----- RANDOM SCORE INJECTOR ----- */
+function generateRandomScores() {
+  if(!isAdmin) return;
+  // Grab all editable individual score inputs that start with s_
+  const scoreInputs = document.querySelectorAll('.match-card input[type=number][id^="s_"]');
+  scoreInputs.forEach(input => {
+    if(!input.disabled) {
+      // Random score between 135 and 258
+      input.value = Math.floor(Math.random() * (258 - 135 + 1)) + 135;
+      // Trigger the existing event listener to update team totals and point previews
+      input.dispatchEvent(new Event('input'));
+    }
+  });
+}
+/* --------------------------------- */
+
 function getBowlerScore(m,pos,side){
   const o=m.bowlers.find(x=>x.pos===pos); return o ? (side==='a'?o.a:o.b) : '';
 }
