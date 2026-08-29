@@ -86,7 +86,7 @@ input,select{
   width:100%;
   padding:10px 11px;
   border:1px solid #444;
-  border-radius:9px;
+  border-radius:99px;
   background:#222;
   color:#fff;
 }
@@ -117,7 +117,7 @@ table{width:100%;border-collapse:collapse;font-size:.93rem}th,td{padding:10px 8p
 .pair-box{padding:10px;border:1px dashed var(--gold);border-radius:10px;margin-top:9px;background:#18181c}
 footer{color:#fff;font-size:.8rem;text-align:center;margin-top:18px;text-shadow:0 1px 2px #000}
 
-/* Login Modal */
+/* Auth Modal */
 #authModal{
   position:fixed;
   top:0;left:0;right:0;bottom:0;
@@ -144,9 +144,11 @@ footer{color:#fff;font-size:.8rem;text-align:center;margin-top:18px;text-shadow:
   padding:14px;
   font-size:1rem;
 }
+
+/* Visibility Control based on Mode */
 .admin-only{display:none !important}
 body.is-admin .admin-only{display:block !important}
-body.is-admin span.admin-only, body.is-admin button.admin-only{display:inline-block !important}
+body.is-admin button.admin-only{display:inline-block !important}
 body.is-admin div.admin-only{display:flex !important}
 
 @media(max-width:900px){.span8,.span6,.span4{grid-column:span 12}.bowler-row{grid-template-columns:1fr 1fr 1fr}.kpis{grid-template-columns:repeat(2,1fr)}.score-grid{grid-template-columns:repeat(3,1fr)}}
@@ -204,13 +206,13 @@ body.is-admin div.admin-only{display:flex !important}
 </header>
 <main>
   <div class="tabs">
-    <button class="tab active" data-tab="registration">1. Registration</button>
-    <button class="tab" data-tab="setup">2. Tournament Setup</button>
-    <button class="tab" data-tab="game">3. Current Game</button>
-    <button class="tab" data-tab="standings">4. Standings</button>
+    <button class="tab admin-only" data-tab="registration">Registration</button>
+    <button class="tab admin-only" data-tab="setup">Tournament Setup</button>
+    <button class="tab admin-only" data-tab="game">Current Game</button>
+    <button class="tab" data-tab="standings">Standings</button>
   </div>
 
-  <section id="registration" class="panel active">
+  <section id="registration" class="panel admin-only">
     <div class="grid">
       <div class="card span8">
         <h2>Team Registration</h2>
@@ -221,7 +223,7 @@ body.is-admin div.admin-only{display:flex !important}
         </div>
         <div id="teamAlert"></div>
         <div id="bowlerInputs"></div>
-        <div class="actions admin-only" style="margin-top:12px">
+        <div class="actions" style="margin-top:12px">
           <button class="btn-primary" id="addTeamBtn">Register Team</button>
           <button class="btn-secondary" id="clearFormBtn">Clear Form</button>
         </div>
@@ -239,7 +241,7 @@ body.is-admin div.admin-only{display:flex !important}
     </div>
   </section>
 
-  <section id="setup" class="panel">
+  <section id="setup" class="panel admin-only">
     <div class="grid">
       <div class="card span8">
         <h2>Tournament Setup</h2>
@@ -249,7 +251,7 @@ body.is-admin div.admin-only{display:flex !important}
           <div><label for="laneShift">Lane movement per round</label><input id="laneShift" type="number" min="1" value="4"></div>
         </div>
         <div class="alert alert-warn" style="margin-top:12px">The default tournament is 7 games: 4 Saturday and 3 Sunday. Every new positions round moves the starting lane 4 lanes to the right.</div>
-        <div class="actions admin-only">
+        <div class="actions">
           <button class="btn-primary" id="startTournamentBtn">Randomize Game 1 & Start</button>
           <button class="btn-danger" id="resetTournamentBtn">Reset Tournament Games</button>
         </div>
@@ -266,7 +268,7 @@ body.is-admin div.admin-only{display:flex !important}
     </div>
   </section>
 
-  <section id="game" class="panel">
+  <section id="game" class="panel admin-only">
     <div id="gameContent"></div>
   </section>
 
@@ -300,6 +302,7 @@ function selectUserRole(){
   document.body.classList.remove('is-admin');
   document.getElementById('roleBadge').textContent = 'Mode: User (View Only)';
   document.getElementById('authModal').style.display = 'none';
+  activateTab('standings');
   renderAll();
 }
 
@@ -310,6 +313,7 @@ function loginAdmin(){
     document.body.classList.add('is-admin');
     document.getElementById('roleBadge').textContent = 'Mode: Admin';
     document.getElementById('authModal').style.display = 'none';
+    activateTab('registration');
     renderAll();
   } else {
     document.getElementById('authAlert').innerHTML = '<div class="alert alert-danger">Incorrect password</div>';
@@ -328,13 +332,11 @@ function loadState(){
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 
-/* Updated Handicap Logic: Female/Female Senior cap is 40; Male/Male Senior cap is 35 */
 function handicap(avg, gender){
   const cap = (gender==='Female'||gender==='Female Senior') ? 40 : 35;
   return Math.max(0, Math.min(cap, 210 - avg));
 }
 
-function genderLabel(g){ return g; }
 function totalAvg(team){ return team.bowlers.reduce((a,b)=>a+b.average,0); }
 function playerOrder(team){ return [...team.bowlers].sort((a,b)=>a.average-b.average || a.name.localeCompare(b.name)); }
 function teamMap(){ return Object.fromEntries(state.teams.map(t=>[t.id,t])); }
@@ -343,9 +345,9 @@ function initBowlerForm(){
   const genders=['Male','Female','Male Senior','Female Senior'];
   document.getElementById('bowlerInputs').innerHTML=[0,1,2].map(i=>`
     <div class="bowler-row">
-      <div><label>Bowler ${i+1} name</label><input class="bn" data-i="${i}" placeholder="Name" ${isAdmin?'':'disabled'}></div>
-      <div><label>Average</label><input class="ba" data-i="${i}" type="number" min="0" step="1" placeholder="0" ${isAdmin?'':'disabled'}></div>
-      <div><label>Gender</label><select class="bg" data-i="${i}" ${isAdmin?'':'disabled'}>${genders.map(g=>`<option>${g}</option>`).join('')}</select></div>
+      <div><label>Bowler ${i+1} name</label><input class="bn" data-i="${i}" placeholder="Name"></div>
+      <div><label>Average</label><input class="ba" data-i="${i}" type="number" min="0" step="1" placeholder="0"></div>
+      <div><label>Gender</label><select class="bg" data-i="${i}">${genders.map(g=>`<option>${g}</option>`).join('')}</select></div>
       <div><label>Handicap</label><input class="bh" data-i="${i}" readonly value="0"></div>
       <div><label>Order</label><input class="bo" data-i="${i}" readonly value="${i+1}"></div>
       <div><label>Preview</label><div class="small muted" id="prev${i}">Enter average and gender</div></div>
@@ -401,7 +403,7 @@ function renderTeams(){
   holder.innerHTML=`<table><thead><tr><th>#</th><th>Team</th><th>Bowler 1</th><th>Bowler 2</th><th>Bowler 3</th><th>Avg Total</th><th>HDCP Total</th><th></th></tr></thead><tbody>${
     state.teams.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.name)}</b><div class="small muted">${esc(t.contact||'')}</div></td>${
       t.bowlers.map(b=>`<td>${esc(b.name)}<br><span class="small muted">${b.average} avg • ${b.handicap} hdcp • ${esc(b.gender)}</span></td>`).join('')
-    }<td>${totalAvg(t)}</td><td>${t.bowlers.reduce((a,b)=>a+b.handicap,0)}</td><td>${isAdmin?`<button class="btn-ghost admin-only" onclick="removeTeam('${t.id}')">Remove</button>`:''}</td></tr>`).join('')
+    }<td>${totalAvg(t)}</td><td>${t.bowlers.reduce((a,b)=>a+b.handicap,0)}</td><td><button class="btn-ghost" onclick="removeTeam('${t.id}')">Remove</button></td></tr>`).join('')
   }</tbody></table>`;
 }
 function removeTeam(id){
@@ -423,9 +425,6 @@ function renderSetup(){
   document.getElementById('satGames').value=state.settings.satGames; 
   document.getElementById('sunGames').value=state.settings.sunGames; 
   document.getElementById('laneShift').value=state.settings.laneShift;
-  document.getElementById('satGames').disabled = !isAdmin;
-  document.getElementById('sunGames').disabled = !isAdmin;
-  document.getElementById('laneShift').disabled = !isAdmin;
 }
 
 function randomizeTeams(){
@@ -463,8 +462,8 @@ function renderGame(){
   const map=teamMap();
   el.innerHTML=`<div class="card"><div class="actions" style="justify-content:space-between"><div><h2>Game ${game.number} — ${game.day}</h2><div class="muted">Starting lane: <b>${game.startLane}</b> • ${game.matches.length} match${game.matches.length===1?'':'es'}</div></div><div class="badge">${game.matches.filter(m=>m.completed).length}/${game.matches.length} matches complete</div></div></div>${
     game.matches.map((m,mi)=>renderMatch(m,mi,map)).join('')
-  }<div class="card"><div class="actions" style="justify-content:space-between"><div class="muted">Scores are entered for each matchup and full team score.</div>${isAdmin?`<button class="btn-primary admin-only" id="finishGameBtn" ${game.matches.some(m=>!m.completed)?'disabled':''}>${game.number<totalGames?'Finish Game & Generate Next Positions Round':'Finish Tournament'}</button>`:''}</div></div>`;
-  if(isAdmin && document.getElementById('finishGameBtn')){
+  }<div class="card"><div class="actions" style="justify-content:space-between"><div class="muted">Scores are entered for each matchup and full team score.</div><button class="btn-primary" id="finishGameBtn" ${game.matches.some(m=>!m.completed)?'disabled':''}>${game.number<totalGames?'Finish Game & Generate Next Positions Round':'Finish Tournament'}</button></div></div>`;
+  if(document.getElementById('finishGameBtn')){
     document.getElementById('finishGameBtn').onclick=finishCurrentGame;
   }
   document.querySelectorAll('.match-card input[type=number]').forEach(inp=>{
@@ -475,7 +474,7 @@ function renderGame(){
 function renderMatch(m,mi,map){
   const A=map[m.aId], B=map[m.bId]; if(!A||!B)return '';
   const as=playerOrder(A), bs=playerOrder(B);
-  const canEdit = isAdmin && !m.completed;
+  const canEdit = !m.completed;
   return `<div class="card match-card"><div class="match-head"><div><b>Lane ${m.laneA} vs Lane ${m.laneB}</b><div class="small muted">${esc(A.name)} vs ${esc(B.name)}</div></div><span class="badge">${m.completed?'Complete':'In progress'}</span></div><div class="match-body">
     <div class="score-grid" style="font-weight:800;margin-bottom:8px"><div>Position</div><div>${esc(A.name)}</div><div></div><div>${esc(B.name)}</div><div>Points</div>
     ${[0,1,2].map(pos=>`<div>P${pos+1}<br><span class="small muted">${esc(as[pos].name)}</span></div>
@@ -486,7 +485,7 @@ function renderMatch(m,mi,map){
     </div>
     <div class="pair-box"><div class="score-grid"><div><b>Team scratch</b></div><div><input type="number" min="0" max="900" id="ts_${m.id}_a" value="${m.teamScoreA??''}" readonly></div><div class="center">vs</div><div><input type="number" min="0" max="900" id="ts_${m.id}_b" value="${m.teamScoreB??''}" readonly></div><div><b id="tp_${m.id}">${m.teamScoreA!==null?teamPointText(m,A,B):'—'}</b></div></div>
       <div class="small muted">Team scratch total is automatically calculated from individual scores. Team handicap is added automatically.</div></div>
-    <div class="actions admin-only" style="justify-content:flex-end;margin-top:10px">${canEdit?`<button class="btn-primary" onclick="saveMatch('${m.id}')">Save Match</button>`:''}</div>
+    <div class="actions" style="justify-content:flex-end;margin-top:10px">${canEdit?`<button class="btn-primary" onclick="saveMatch('${m.id}')">Save Match</button>`:''}</div>
   </div></div>`;
 }
 function getBowlerScore(m,pos,side){
