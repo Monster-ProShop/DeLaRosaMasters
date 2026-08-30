@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tournament Setup — De La Rosa Masters</title>
+<link rel="stylesheet" href="app.css" />
+<style>
+  .lane-mini{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;margin:2px;border-radius:6px;font-size:.74rem;font-weight:800}
+  .lane-teamA{background:#2a2a30;color:#fff;border:1px solid var(--accent)}
+  .lane-teamB{background:#222;color:var(--gold);border:1px solid var(--gold)}
+  .shift-block{margin-bottom:20px}
+  .lane-wrap{display:flex;flex-wrap:wrap;gap:0}
+  .edit-inline{display:inline-block}
+</style>
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+<div id="header-host"></div>
+<main>
+  <section id="setup" class="panel active">
+    <div class="grid">
+      <div class="card span12">
+        <h2>Tournament Setup & Initial Assignments</h2>
+        <p class="muted">View registered teams, configure game counts, and generate the first randomized lane/team assignment per shift. You can also edit a team's shift or player details directly from here.</p>
+        <div class="row" style="margin:14px 0">
+          <div style="flex:0 0 160px">
+            <label for="setupLanes">Lane Quantity</label>
+            <input id="setupLanes" type="number" min="1" max="100" value="30">
+          </div>
+          <div style="flex:0 0 140px">
+            <label for="satGames">Saturday Games</label>
+            <input id="satGames" type="number" min="0" max="10" value="4">
+          </div>
+          <div style="flex:0 0 140px">
+            <label for="sunGames">Sunday Games</label>
+            <input id="sunGames" type="number" min="0" max="10" value="3">
+          </div>
+        </div>
+        <div class="actions" style="margin-top:12px; margin-bottom:16px;">
+          <button class="btn-primary" id="startTournamentBtn">Randomize & Start Tournament</button>
+          <button class="btn-danger" id="resetTournamentBtn">Reset Tournament Games</button>
+        </div>
+        <div id="setupStatus"></div>
+      </div>
+
+      <div class="card span12">
+        <div class="actions" style="justify-content:space-between">
+          <h3 style="margin:0">Registered Teams Overview</h3>
+          <span id="setupTeamCount" class="badge">0 teams</span>
+        </div>
+        <div id="setupTeamsTable"></div>
+      </div>
+
+      <div class="card span12" id="editPanel" style="display:none; border-color: var(--gold);">
+        <div class="actions" style="justify-content:space-between">
+          <h2 style="margin:0">Edit Team Details</h2>
+          <button class="btn-ghost" onclick="cancelEdit()">Cancel</button>
+        </div>
+        <div id="editFormBody"></div>
+      </div>
+
+      <div class="card span12" id="assignmentsCard" style="display:none">
+        <h3>Lane Assignments — Game <span id="assignGameNo">1</span></h3>
+        <div id="assignmentsBody"></div>
+      </div>
+    </div>
+  </section>
+  <footer>Data is stored locally in browser storage. De La Rosa Masters • Ilusión Bowl Edition</footer>
+</main>
+
+<script src="app.js"></script>
+<script>
+(function(){
+  const { getState, save, esc, handicap, totalAvg, teamTotals } = App;
+
+  function randomizeTeamsForShift(shiftTeams){
+    const ids = shiftTeams.map(t=>t.id);
+    for(let i=ids.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    return ids;
+  }
+
+  function createGameFromShifts(gameNo){
+    const state = getState();
+    const totalLanes = state.settings.totalLanes;
+    let allMatches = [];
+    for(let shift = 1; shift <= 3; shift++){
+      const shiftTeams = state.teams.filter(t => (t.shift || 1) === shift);
+      if(shiftTeams.length === 0) continue;
+      let randomizedIds = randomizeTeamsForShift(shiftTeams);
+      if(randomizedIds.length % 2 !== 0) randomizedIds.push(null);
+      const shiftLaneOffset = (shift - 1) * totalLanes;
+      for(let i=0; i<randomizedIds.length; i+=2){
+        const a = randomizedIds[i], b = randomizedIds[i+1];
+        if(!a) continue;
+        const laneIndex = (i / 2) % totalLanes;
+        const laneA = shiftLaneOffset + (laneIndex * 2) + 1;
+        const laneB = shiftLaneOffset + (laneIndex * 2) + 2;
+        allMatches.push({ id: crypto.randomUUID(), shift, aId:a, bId:b, laneA, laneB, completed:false, teamScoreA:null, teamScoreB:null, bowlers:[] });
+      }
+    }
+    return { number: gameNo, day: gameNo <= state.settings.satGames ? 'Saturday' : 'Sunday', matches: allMatches };
+  }
+
+  window.startTournament = function(){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    if(state.teams.length < 2){ alert('Register at least 2 teams first.'); return; }
+    const totalGames = state.settings.satGames + state.settings.sunGames;
+    if(totalGames < 1){ alert('Set at least one game (Saturday or Sunday).'); return; }
+    state.games = [];
+    for(let g=1; g<=totalGames; g++) state.games.push(createGameFromShifts(g));
+    state.currentGame = 1; state.started = true;
+    save();
+    renderAll();
+    if(confirm('Tournament started! View the first game?')) location.href = 'current-game.html';
+  };
+
+  window.resetTournament = function(){
+    if(!App.getIsAdmin()) return;
+    if(!confirm('Reset all game pairings and scores? Teams remain registered.')) return;
+    const state = getState();
+    state.games=[]; state.currentGame=1; state.started=false;
+    save(); renderAll();
+  };
+
+  /* ---------- Edit team (shift / players) ---------- */
+  let editingId = null;
+
+  window.editTeam = function(id){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    const t = state.teams.find(x=>x.id===id);
+    if(!t) return;
+    editingId = id;
+    const panel = document.getElementById('editPanel');
+    panel.style.display = 'block';
+    const genders=['Male','Female','Male Senior','Female Senior'];
+
+    const bowlerRows = t.bowlers.map((b,i)=>`
+      <div class="edit-row">
+        <div><label>Bowler ${i+1} name</label><input id="ebn_${i}" value="${esc(b.name)}"></div>
+        <div><label>Average</label><input id="eba_${i}" type="number" min="0" value="${b.average}"></div>
+        <div><label>Gender</label><select id="ebg_${i}">${genders.map(g=>`<option ${g===b.gender?'selected':''}>${g}</option>`).join('')}</select></div>
+        <div><label>Handicap (auto)</label><input id="ebh_${i}" readonly value="${b.handicap}"></div>
+        <div><label>Order (auto)</label><input id="ebo_${i}" readonly value="${i+1}"></div>
+        <div class="small muted" id="ebprev_${i}">—</div>
+      </div>`).join('');
+
+    document.getElementById('editFormBody').innerHTML = `
+      <p class="muted">Editing a team's shift or bowlers updates the team instantly. If the tournament is in progress, lane assignments are NOT regenerated automatically — re-run "Randomize & Start" to rebuild pairings.</p>
+      <div class="row" style="margin-bottom:14px">
+        <div><label>Team name</label><input id="eTeamName" value="${esc(t.name)}"></div>
+        <div style="flex:0 0 180px"><label>Optional contact</label><input id="eTeamContact" value="${esc(t.contact||'')}"></div>
+        <div style="flex:0 0 160px"><label>Shift</label><select id="eTeamShift">
+          <option value="1" ${t.shift==1?'selected':''}>Shift 1</option>
+          <option value="2" ${t.shift==2?'selected':''}>Shift 2</option>
+          <option value="3" ${t.shift==3?'selected':''}>Shift 3</option>
+        </select></div>
+      </div>
+      <div id="editTeamAlert"></div>
+      ${bowlerRows}
+      <div class="actions" style="margin-top:12px">
+        <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+        <button class="btn-ghost" onclick="cancelEdit()">Cancel</button>
+      </div>`;
+
+    for(let i=0;i<3;i++){
+      document.getElementById(`eba_${i}`).addEventListener('input', refreshEditPreview);
+      document.getElementById(`ebg_${i}`).addEventListener('change', refreshEditPreview);
+    }
+    refreshEditPreview();
+    panel.scrollIntoView({behavior:'smooth', block:'center'});
+  };
+
+  function refreshEditPreview(){
+    const bs=[0,1,2].map(i=>{
+      const avg=Number(document.getElementById(`eba_${i}`).value)||0;
+      const g=document.getElementById(`ebg_${i}`).value;
+      return {i,avg,g,h:handicap(avg,g)};
+    });
+    const sorted=[...bs].sort((a,b)=>a.avg-b.avg||a.i-b.i);
+    sorted.forEach((b,idx)=>{
+      const bh=document.getElementById(`ebh_${b.i}`);
+      const bo=document.getElementById(`ebo_${b.i}`);
+      const prev=document.getElementById(`ebprev_${b.i}`);
+      if(bh) bh.value=b.h;
+      if(bo) bo.value=idx+1;
+      if(prev) prev.textContent=`Handicap ${b.h} • Position ${idx+1}`;
+    });
+    const sum=bs.reduce((a,b)=>a+b.avg,0);
+    const box=document.getElementById('editTeamAlert');
+    if(box) box.innerHTML = sum>630
+      ? `<div class="alert alert-danger">ERROR: Team average is <b>${sum}</b>. Maximum allowed is <b>630</b>.</div>`
+      : `<div class="alert alert-ok">Team average total: <b>${sum}</b> / 630</div>`;
+  }
+
+  window.saveEdit = function(){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    const t = state.teams.find(x=>x.id===editingId);
+    if(!t){ cancelEdit(); return; }
+    const name=document.getElementById('eTeamName').value.trim();
+    const contact=document.getElementById('eTeamContact').value.trim();
+    const shift=Number(document.getElementById('eTeamShift').value);
+    if(!name){ showEditAlert('Please enter a team name.','danger'); return; }
+
+    const bowlers=[0,1,2].map(i=>({
+      name:document.getElementById(`ebn_${i}`).value.trim(),
+      average:Number(document.getElementById(`eba_${i}`).value),
+      gender:document.getElementById(`ebg_${i}`).value
+    }));
+    if(bowlers.some(b=>!b.name || !Number.isFinite(b.average))){ showEditAlert('Please enter all 3 bowler names and averages.','danger'); return; }
+    if(bowlers.some(b=>b.average<0)){ showEditAlert('Average cannot be negative.','danger'); return; }
+    const sum=bowlers.reduce((a,b)=>a+b.average,0);
+    if(sum>630){ showEditAlert(`ERROR: Team average is ${sum}. Maximum is 630.`,'danger'); return; }
+
+    const totalLanes = state.settings.totalLanes;
+    if(shift !== (t.shift||1)){
+      const othersInShift = state.teams.filter(x=>x.id!==t.id && (x.shift||1)===shift).length;
+      if(othersInShift >= totalLanes){ showEditAlert(`Shift ${shift} is full (${totalLanes} teams max). Choose a different shift.`,'danger'); return; }
+    }
+    const sorted=bowlers.sort((a,b)=>a.average-b.average);
+    sorted.forEach(b=>b.handicap=handicap(b.average,b.gender));
+    t.name=name; t.contact=contact; t.shift=shift; t.bowlers=sorted;
+    save(); cancelEdit(); renderAll();
+  };
+
+  function showEditAlert(msg,type){
+    const box=document.getElementById('editTeamAlert');
+    if(box) box.innerHTML=`<div class="alert alert-${type==='danger'?'danger':'ok'}">${esc(msg)}</div>`;
+  }
+
+  window.cancelEdit = function(){
+    editingId=null;
+    document.getElementById('editPanel').style.display='none';
+    document.getElementById('editFormBody').innerHTML='';
+  };
+
+  window.removeTeam = function(id){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    if(state.started){ alert('Cannot remove teams after tournament start. Use Edit to adjust instead.'); return; }
+    state.teams = state.teams.filter(t=>t.id!==id);
+    save(); renderAll();
+  };
+
+  /* ---------- Rendering ---------- */
+  function renderOverview(){
+    const state = getState();
+    const holder=document.getElementById('setupTeamsTable');
+    document.getElementById('setupTeamCount').textContent=`${state.teams.length} team${state.teams.length===1?'':'s'}`;
+    if(!state.teams.length){
+      holder.innerHTML='<div class="empty">No teams registered yet. Go to Team Registration to add teams.</div>';
+      return;
+    }
+    const canManage = App.getIsAdmin() && !state.started;
+    const actionHeader = App.getIsAdmin() ? `<th>Actions</th>` : '';
+    holder.innerHTML = `<table><thead><tr><th>#</th><th>Team</th><th>Shift</th><th>Bowler 1</th><th>Bowler 2</th><th>Bowler 3</th><th>Avg Total</th><th>HDCP Total</th>${actionHeader}</tr></thead><tbody>${
+      state.teams.map((t,i)=>{
+        const actions = App.getIsAdmin()
+          ? `<td class="actions">
+              <button class="btn-ghost" onclick="editTeam('${t.id}')">Edit</button>
+              <button class="btn-danger" onclick="removeTeam('${t.id}')" ${state.started?'disabled title="Tournament started"':''}>Remove</button>
+            </td>` : '';
+        return `<tr>
+          <td>${i+1}</td>
+          <td><b>${esc(t.name)}</b><div class="small muted">${esc(t.contact||'')}</div></td>
+          <td>Shift ${t.shift||1}</td>
+          ${t.bowlers.map(b=>`<td>${esc(b.name)}<br><span class="small muted">${b.average} avg • ${b.handicap} hdcp</span></td>`).join('')}
+          <td>${totalAvg(t)}</td>
+          <td>${t.bowlers.reduce((a,b)=>a+b.handicap,0)}</td>
+          ${actions}
+        </tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }
+
+  function renderAssignments(){
+    const state = getState();
+    const card = document.getElementById('assignmentsCard');
+    if(!state.started || !state.games.length){ card.style.display='none'; return; }
+    const game = state.games.find(g=>g.number===state.currentGame) || state.games[0];
+    document.getElementById('assignGameNo').textContent = game.number;
+    card.style.display = 'block';
+    const map = App.teamMap();
+    let html = '';
+    for(let shift=1; shift<=3; shift++){
+      const matches = game.matches.filter(m=>m.shift===shift);
+      if(!matches.length) continue;
+      html += `<div class="shift-block"><h3>Shift ${shift}</h3>`;
+      html += matches.map(m=>{
+        const A=map[m.aId], B=map[m.bId];
+        if(!A) return '';
+        const bName = B ? esc(B.name) : '<span class="muted">— BYE —</span>';
+        return `<div class="lane-mini lane-teamA" title="${esc(A.name)}">L${m.laneA} ${esc(A.name)}</div>
+                <div class="lane-mini lane-teamB" title="${B?esc(B.name):'BYE'}">L${m.laneB} ${bName}</div>`;
+      }).join('');
+      html += `</div>`;
+    }
+    if(!html) html = '<div class="empty">No matches assigned for this game.</div>';
+    document.getElementById('assignmentsBody').innerHTML = html + `<p class="small muted" style="margin-top:8px">L = Lane. Pairings are randomized per shift within available lanes. Edit a team above then re-run Randomize to rebuild.</p>`;
+  }
+
+  function renderStatus(){
+    const state = getState();
+    const el = document.getElementById('setupStatus');
+    if(state.started){
+      el.innerHTML = `<div class="alert alert-ok">Tournament in progress — ${state.games.length} games generated. Current game: ${state.currentGame}. <a href="current-game.html" style="color:var(--gold);font-weight:800">Go to Current Game →</a></div>`;
+    } else {
+      el.innerHTML = `<div class="alert alert-warn">Tournament not started. Configure lanes and games, register teams, then click "Randomize & Start Tournament".</div>`;
+    }
+  }
+
+  function renderAll(){
+    const state = getState();
+    document.getElementById('setupLanes').value = state.settings.totalLanes;
+    document.getElementById('satGames').value = state.settings.satGames;
+    document.getElementById('sunGames').value = state.settings.sunGames;
+    renderOverview();
+    renderAssignments();
+    renderStatus();
+    App.updateHeaderStatus();
+  }
+
+  /* ---------- Boot ---------- */
+  App.mountPage('setup');
+  document.getElementById('startTournamentBtn').onclick = window.startTournament;
+  document.getElementById('resetTournamentBtn').onclick = window.resetTournament;
+  document.getElementById('setupLanes').addEventListener('change', ()=>{
+    const v = Number(document.getElementById('setupLanes').value)||30;
+    if(v<1||v>100) return;
+    getState().settings.totalLanes = v; save(); renderAll();
+  });
+  document.getElementById('satGames').addEventListener('change', ()=>{
+    const v = Math.max(0, Math.min(10, Number(document.getElementById('satGames').value)||0));
+    getState().settings.satGames = v; save(); renderAll();
+  });
+  document.getElementById('sunGames').addEventListener('change', ()=>{
+    const v = Math.max(0, Math.min(10, Number(document.getElementById('sunGames').value)||0));
+    getState().settings.sunGames = v; save(); renderAll();
+  });
+  window.onAuthSuccess = renderAll;
+  window.onStateSaved = renderAll;
+  renderAll();
+})();
+</script>
+</body>
+</html>

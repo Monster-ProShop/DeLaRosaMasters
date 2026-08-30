@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Current Game — De La Rosa Masters</title>
+<link rel="stylesheet" href="app.css" />
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+<div id="header-host"></div>
+<main>
+  <section id="game" class="panel active">
+    <div class="card" style="margin-bottom:14px;">
+      <div class="row" style="align-items:center;">
+        <div>
+          <label for="auditGameSelect">Select Game to Audit</label>
+          <select id="auditGameSelect"></select>
+        </div>
+        <div>
+          <label for="auditShiftFilter">Filter by Shift</label>
+          <select id="auditShiftFilter">
+            <option value="all">All Shifts</option>
+            <option value="1">Shift 1</option>
+            <option value="2">Shift 2</option>
+            <option value="3">Shift 3</option>
+          </select>
+        </div>
+        <div class="admin-only" style="align-self:end">
+          <button class="btn-secondary" onclick="reopenMatch()" title="Allow editing a completed match again">Re-open Match</button>
+        </div>
+      </div>
+    </div>
+    <div id="gameContent"></div>
+  </section>
+  <footer>Data is stored locally in browser storage. De La Rosa Masters • Ilusión Bowl Edition</footer>
+</main>
+
+<script src="app.js"></script>
+<script>
+(function(){
+  const { getState, save, esc, teamTotals, playerOrder } = App;
+
+  function getBowlerScore(m,pos,side){
+    const o=m.bowlers.find(x=>x.pos===pos);
+    return o ? (side==='a'?o.a:o.b) : '';
+  }
+
+  function renderMatch(m,map){
+    const A=map[m.aId], B=map[m.bId];
+    if(!A||!B) return '';
+    const as=playerOrder(A), bs=playerOrder(B);
+    const canEdit = App.getIsAdmin() && !m.completed;
+
+    return `<div class="card match-card" data-match-id="${m.id}"><div class="match-head"><div><b>Shift ${m.shift} • Lanes ${m.laneA} & ${m.laneB}</b><div class="small muted">${esc(A.name)} vs ${esc(B.name)}</div></div><span class="badge">${m.completed?'Complete':'In progress'}</span></div><div class="match-body">
+      <div class="score-grid" style="font-weight:800;margin-bottom:8px">
+        <div>Bowler / Position</div>
+        <div class="center">${esc(A.name)}<br><span class="small muted">Scratch</span></div>
+        <div class="center">HDCP Total</div>
+        <div class="center">${esc(B.name)}<br><span class="small muted">Scratch</span></div>
+        <div class="center">HDCP Total</div>
+        <div class="center">Status</div>
+      </div>
+      ${[0,1,2].map(pos=>`
+      <div class="score-grid" style="margin-bottom:6px">
+        <div><b>P${pos+1}</b><br><span class="small muted">${esc(as[pos].name)} (${as[pos].handicap}) vs ${esc(bs[pos].name)} (${bs[pos].handicap})</span></div>
+        <div><input type="number" min="0" max="300" id="s_${m.id}_a_${pos}" value="${getBowlerScore(m,pos,'a')}" ${canEdit?'':'disabled'}></div>
+        <div class="center" id="thdcp_${m.id}_a_${pos}" style="font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span id="thdcp_val_${m.id}_a_${pos}">—</span><span id="p_a_${m.id}_${pos}" style="font-size:1.1rem;"></span>
+        </div>
+        <div><input type="number" min="0" max="300" id="s_${m.id}_b_${pos}" value="${getBowlerScore(m,pos,'b')}" ${canEdit?'':'disabled'}></div>
+        <div class="center" id="thdcp_${m.id}_b_${pos}" style="font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span id="thdcp_val_${m.id}_b_${pos}">—</span><span id="p_b_${m.id}_${pos}" style="font-size:1.1rem;"></span>
+        </div>
+        <div class="center" id="p_${m.id}_${pos}" style="font-size:1.1rem;"></div>
+      </div>`).join('')}
+
+      <div class="pair-box">
+        <div class="score-grid">
+          <div><b>Team Total Scratch & HDCP</b></div>
+          <div><input type="number" id="ts_${m.id}_a" value="${m.teamScoreA??''}" readonly placeholder="Scratch"></div>
+          <div class="center" id="tots_${m.id}_a" style="font-weight:800; color:var(--gold); display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span id="tots_val_${m.id}_a">—</span><span id="tp_a_${m.id}" style="font-size:1.2rem;"></span>
+          </div>
+          <div><input type="number" id="ts_${m.id}_b" value="${m.teamScoreB??''}" readonly placeholder="Scratch"></div>
+          <div class="center" id="tots_${m.id}_b" style="font-weight:800; color:var(--gold); display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span id="tots_val_${m.id}_b">—</span><span id="tp_b_${m.id}" style="font-size:1.2rem;"></span>
+          </div>
+          <div class="center" id="tp_${m.id}" style="font-size:1.2rem;"></div>
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-end;margin-top:10px">
+        ${App.getIsAdmin() && m.completed ? `<button class="btn-ghost" onclick="reopenMatch('${m.id}')">Re-open Match</button>`:''}
+        ${canEdit?`<button class="btn-primary" onclick="saveMatch('${m.id}')">Save Match</button>`:''}
+      </div>
+    </div></div>`;
+  }
+
+  function refreshMatchPreview(id){
+    const state=getState();
+    const game=state.games.find(g=>g.number===state.currentGame);
+    const m=game?.matches.find(x=>x.id===id);
+    if(!m) return;
+    const map=App.teamMap(), A=map[m.aId], B=map[m.bId];
+    if(!A||!B) return;
+    const as=playerOrder(A), bs=playerOrder(B);
+    let ta=0, tb=0;
+    for(let pos=0; pos<3; pos++){
+      const aInp = document.getElementById(`s_${id}_a_${pos}`);
+      const bInp = document.getElementById(`s_${id}_b_${pos}`);
+      const a = Number(aInp?.value)||0, b = Number(bInp?.value)||0;
+      ta+=a; tb+=b;
+      const haTotal = a + as[pos].handicap;
+      const hbTotal = b + bs[pos].handicap;
+      const elAVal = document.getElementById(`thdcp_val_${id}_a_${pos}`);
+      const elBVal = document.getElementById(`thdcp_val_${id}_b_${pos}`);
+      if(elAVal) elAVal.textContent = aInp?.value!=='' ? haTotal : '—';
+      if(elBVal) elBVal.textContent = bInp?.value!=='' ? hbTotal : '—';
+      const pA = document.getElementById(`p_a_${id}_${pos}`), pB = document.getElementById(`p_b_${id}_${pos}`);
+      if(aInp?.value!=='' && bInp?.value!==''){
+        if(haTotal === hbTotal){ if(pA)pA.textContent='🤝'; if(pB)pB.textContent='🤝'; }
+        else if(haTotal > hbTotal){ if(pA)pA.textContent='🟢'; if(pB)pB.textContent='❌'; }
+        else { if(pA)pA.textContent='❌'; if(pB)pB.textContent='🟢'; }
+      } else { if(pA)pA.textContent=''; if(pB)pB.textContent=''; }
+    }
+    const ea=document.getElementById(`ts_${id}_a`), eb=document.getElementById(`ts_${id}_b`);
+    const totsAVal=document.getElementById(`tots_val_${id}_a`), totsBVal=document.getElementById(`tots_val_${id}_b`);
+    const tpA=document.getElementById(`tp_a_${id}`), tpB=document.getElementById(`tp_b_${id}`);
+    if(ea) ea.value=ta; if(eb) eb.value=tb;
+    const teamHdcpA=teamTotals(A).hdcp, teamHdcpB=teamTotals(B).hdcp;
+    const teamSumA=ta+teamHdcpA, teamSumB=tb+teamHdcpB;
+    if(totsAVal) totsAVal.textContent = ea?.value!=='' ? teamSumA : '—';
+    if(totsBVal) totsBVal.textContent = eb?.value!=='' ? teamSumB : '—';
+    if(ea?.value!=='' && eb?.value!==''){
+      if(teamSumA===teamSumB){ if(tpA)tpA.textContent='🤝'; if(tpB)tpB.textContent='🤝'; }
+      else if(teamSumA>teamSumB){ if(tpA)tpA.textContent='🟢🟢'; if(tpB)tpB.textContent='❌❌'; }
+      else { if(tpA)tpA.textContent='❌❌'; if(tpB)tpB.textContent='🟢🟢'; }
+    } else { if(tpA)tpA.textContent=''; if(tpB)tpB.textContent=''; }
+  }
+
+  function renderGame(){
+    const state=getState();
+    const el=document.getElementById('gameContent');
+    if(!state.started || !state.games.length){
+      el.innerHTML=`<div class="card"><div class="empty">Tournament has not started. Use <a href="tournament-setup.html" style="color:var(--gold);font-weight:800">Tournament Setup</a> to randomize and start.</div></div>`;
+      return;
+    }
+    const totalGames = state.settings.satGames + state.settings.sunGames;
+    const gameSelect = document.getElementById('auditGameSelect');
+    gameSelect.innerHTML = Array.from({length: totalGames}, (_, i) => `<option value="${i+1}">Game ${i+1} (${i+1 <= state.settings.satGames ? 'Saturday' : 'Sunday'})</option>`).join('');
+    gameSelect.value = state.currentGame;
+    gameSelect.onchange = (e)=>{ state.currentGame = Number(e.target.value); save(); renderGame(); };
+
+    const shiftFilter = document.getElementById('auditShiftFilter').value;
+    const game = state.games.find(g=>g.number===state.currentGame);
+    if(!game){ el.innerHTML=`<div class="card"><div class="empty">No active game data.</div></div>`; return; }
+    const map = App.teamMap();
+    const filteredMatches = game.matches.filter(m=>shiftFilter==='all' || String(m.shift)===shiftFilter);
+
+    let html = `<div class="card" style="margin-bottom:14px;"><div class="actions" style="justify-content:space-between">
+        <div><h2>Game ${game.number} — ${game.day}</h2><div class="muted">Quantity of Lanes: <b>${state.settings.totalLanes}</b> • Showing ${filteredMatches.length} match${filteredMatches.length===1?'':'es'}</div></div>
+        <div class="actions"><div class="badge">${game.matches.filter(m=>m.completed).length}/${game.matches.length} matches complete</div></div>
+      </div></div>`;
+
+    if(filteredMatches.length===0){
+      html += `<div class="card"><div class="empty">No matches found for the selected shift in this game round.</div></div>`;
+    } else {
+      html += filteredMatches.map((m)=>renderMatch(m,map)).join('');
+    }
+
+    if(App.getIsAdmin() && game.matches.some(m=>!m.completed)){
+      html += `<div class="fab-container">
+        <button class="fab fab-random" onclick="generateRandomScores()">🎲 Randomize (145-258)</button>
+        <button class="fab fab-save" onclick="saveAllMatches()">💾 Save All Matches</button>
+      </div>`;
+    }
+    el.innerHTML = html;
+
+    document.querySelectorAll('.match-card input[type=number]').forEach(inp=>{
+      if(inp.id.startsWith('s_')) inp.addEventListener('input',()=>refreshMatchPreview(inp.id.split('_')[1]));
+    });
+    game.matches.forEach(m=>refreshMatchPreview(m.id));
+  }
+
+  window.generateRandomScores = function(){
+    if(!App.getIsAdmin()) return;
+    const scoreInputs = document.querySelectorAll('.match-card input[type=number][id^="s_"]');
+    scoreInputs.forEach(input=>{
+      if(!input.disabled){
+        input.value = Math.floor(Math.random()*(258-145+1))+145;
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+  };
+
+  window.saveAllMatches = function(){
+    if(!App.getIsAdmin()) return;
+    const state=getState();
+    const game = state.games.find(g=>g.number===state.currentGame);
+    if(!game) return;
+    let hasError=false;
+    game.matches.forEach(m=>{
+      if(m.completed) return;
+      // Skip BYE matches (one side has no team)
+      if(!m.aId || !m.bId){ m.completed = true; return; }
+      const bowlers=[];
+      let missing=false;
+      for(let pos=0; pos<3; pos++){
+        const aEl=document.getElementById(`s_${m.id}_a_${pos}`);
+        const bEl=document.getElementById(`s_${m.id}_b_${pos}`);
+        if(!aEl || !bEl){ missing=true; break; }
+        const aVal=aEl.value, bVal=bEl.value;
+        if(aVal===''||bVal===''){ hasError=true; return; }
+        const a=Number(aVal), b=Number(bVal);
+        if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0||a>300||b>300){ hasError=true; return; }
+        bowlers.push({pos,a,b});
+      }
+      if(missing){ return; }
+      if(!hasError && bowlers.length===3){
+        const ta=bowlers.reduce((sum,o)=>sum+o.a,0);
+        const tb=bowlers.reduce((sum,o)=>sum+o.b,0);
+        m.bowlers=bowlers; m.teamScoreA=ta; m.teamScoreB=tb; m.completed=true;
+      }
+    });
+    if(hasError){ alert('Could not save all matches. Please ensure all bowler scores are entered correctly (0–300).'); }
+    else { save(); renderGame(); }
+  };
+
+  window.saveMatch = function(id){
+    if(!App.getIsAdmin()) return;
+    const state=getState();
+    const game=state.games.find(g=>g.number===state.currentGame);
+    const m=game.matches.find(x=>x.id===id);
+    if(!m.aId || !m.bId){ m.completed = true; save(); renderGame(); return; }
+    const bowlers=[];
+    for(let pos=0;pos<3;pos++){
+      const aEl=document.getElementById(`s_${id}_a_${pos}`);
+      const bEl=document.getElementById(`s_${id}_b_${pos}`);
+      if(!aEl || !bEl){ alert('Match data unavailable.'); return; }
+      const a=Number(aEl.value), b=Number(bEl.value);
+      if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0||a>300||b>300){ alert('Please enter valid bowler scores (0–300).'); return; }
+      bowlers.push({pos,a,b});
+    }
+    const ta=bowlers.reduce((sum,o)=>sum+o.a,0), tb=bowlers.reduce((sum,o)=>sum+o.b,0);
+    m.bowlers=bowlers; m.teamScoreA=ta; m.teamScoreB=tb; m.completed=true;
+    save(); renderGame();
+  };
+
+  // Re-open a completed match so admins can edit scores (fix typos)
+  window.reopenMatch = function(id){
+    if(!App.getIsAdmin()) return;
+    const state=getState();
+    const game=state.games.find(g=>g.number===state.currentGame);
+    if(!game) return;
+    let target;
+    if(id){ target = game.matches.find(m=>m.id===id); }
+    if(!target){
+      // No id provided (toolbar button) — re-open the first completed match in the current filter
+      const shiftFilter = document.getElementById('auditShiftFilter').value;
+      target = game.matches.find(m=>m.completed && (shiftFilter==='all'||String(m.shift)===shiftFilter));
+    }
+    if(!target){ alert('No completed match to re-open in the current view.'); return; }
+    if(!confirm('Re-open this match to edit its scores? Standings will update after you save again.')) return;
+    target.completed = false;
+    save();
+    renderGame();
+  };
+
+  function renderAll(){ renderGame(); App.updateHeaderStatus(); }
+
+  /* ---------- Boot ---------- */
+  App.mountPage('game');
+  document.getElementById('auditShiftFilter').onchange = ()=>renderGame();
+  window.onAuthSuccess = renderAll;
+  window.onStateSaved = renderGame;
+  renderAll();
+})();
+</script>
+</body>
+</html>
