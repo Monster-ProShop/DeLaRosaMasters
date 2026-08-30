@@ -234,6 +234,7 @@ body.is-admin div.admin-only{display:flex !important}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn-danger" style="padding:6px 12px;font-size:0.75rem;" onclick="promptEraseEverything()">Erase & Start Over</button>
       <div id="roleBadge" class="badge" style="background:#000">Mode: User</div>
       <div id="headerStatus" class="badge">7 games • Shifts 1, 2, 3</div>
     </div>
@@ -397,6 +398,24 @@ function loginAdmin(){
     renderAll();
   } else {
     document.getElementById('authAlert').innerHTML = '<div class="alert alert-danger">Incorrect password</div>';
+  }
+}
+
+function promptEraseEverything(){
+  const pass = prompt("WARNING: This will erase everything and start over. Please enter the admin password to confirm:");
+  if(pass === null) return;
+  if(pass === 'B0l1ch3b1ll4r'){
+    localStorage.removeItem(STORAGE_KEY);
+    state = defaultState();
+    isAdmin = false;
+    document.body.classList.remove('is-admin');
+    document.getElementById('roleBadge').textContent = 'Mode: User';
+    document.getElementById('authModal').style.display = 'flex';
+    document.getElementById('adminPass').value = '';
+    document.getElementById('authAlert').innerHTML = '';
+    save();
+  } else {
+    alert('Incorrect admin password. Action cancelled.');
   }
 }
 
@@ -1030,4 +1049,3 @@ initBowlerForm();
 </script>
 </body>
 </html>
-```[cite: 5]
