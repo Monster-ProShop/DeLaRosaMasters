@@ -51,39 +51,41 @@
           const aa=o.a+A.bowlers[pos].handicap, bb=o.b+B.bowlers[pos].handicap;
           if(aa>bb)ap+=2; else if(aa<bb)bp+=2; else {ap+=1;bp+=1;}
         });
-        // Net pinfall per game = scratch team total + team handicap total
-        const ha=m.teamScoreA+teamTotals(A).hdcp, hb=m.teamScoreB+teamTotals(B).hdcp;
-        sa.gameNet[g.number]=ha; sb.gameNet[g.number]=hb;
-        sa.pinfall+=ha; sb.pinfall+=hb;
-        if(ha>hb)ap+=4; else if(ha<hb)bp+=4; else {ap+=2;bp+=2;}
-        sa.points+=ap; sb.points+=bp; sa.games++; sb.games++;
+        function calculatePlayerStandings(){
+  const state=getState();
+  const map=App.teamMap(), players=[];
+  state.teams.forEach(t=>t.bowlers.forEach(b=>players.push({
+    id: t.id+'|'+b.name, name: b.name, team: t.name, gender: b.gender,
+    handicap: b.handicap, points:0, pinfall:0, highest:0, games:0, gameScores:{}
+  })));
+  const sm=Object.fromEntries(players.map(p=>[p.id,p]));
+  for(const g of state.games) for(const m of g.matches){
+    if(!m.completed) continue;
+    const A=map[m.aId], B=map[m.bId];
+    if(!A||!B) continue;
+    m.bowlers.forEach((o,pos)=>{
+      const pa=sm[m.aId+'|'+A.bowlers[pos].name], pb=sm[m.bId+'|'+B.bowlers[pos].name];
+      if(pa){
+        const netA=o.a+A.bowlers[pos].handicap, netB=o.b+B.bowlers[pos].handicap;
+        pa.points += netA>netB?2:netA===netB?1:0;
+        pa.gameScores[g.number]=netA;          // net pinfall per game
+        pa.pinfall+=netA;                       // total WITH handicap
+        pa.highest=Math.max(pa.highest,netA);   // track highest net game
+        pa.games++;
       }
-    }
-    return stats.sort((a,b)=>b.points-a.points||b.pinfall-a.pinfall||a.name.localeCompare(b.name));
+      if(pb){
+        const netA=o.a+A.bowlers[pos].handicap, netB=o.b+B.bowlers[pos].handicap;
+        pb.points += netB>netA?2:netB===netA?1:0;
+        pb.gameScores[g.number]=netB;          // net pinfall per game
+        pb.pinfall+=netB;                       // total WITH handicap
+        pb.highest=Math.max(pb.highest,netB);   // track highest net game
+        pb.games++;
+      }
+    });
   }
-
-  function calculatePlayerStandings(){
-    const state=getState();
-    const map=App.teamMap(), players=[];
-    state.teams.forEach(t=>t.bowlers.forEach(b=>players.push({
-      id: t.id+'|'+b.name, name: b.name, team: t.name, gender: b.gender,
-      handicap: b.handicap, points:0, pinfall:0, highest:0, games:0, gameScores:{}
-    })));
-    const sm=Object.fromEntries(players.map(p=>[p.id,p]));
-    for(const g of state.games) for(const m of g.matches){
-      if(!m.completed) continue;
-      const A=map[m.aId], B=map[m.bId];
-      if(!A||!B) continue;
-      m.bowlers.forEach((o,pos)=>{
-        const pa=sm[m.aId+'|'+A.bowlers[pos].name], pb=sm[m.bId+'|'+B.bowlers[pos].name];
-        if(pa){
-          const netA=o.a+A.bowlers[pos].handicap, netB=o.b+B.bowlers[pos].handicap;
-          pa.points += netA>netB?2:netA===netB?1:0;
-          pa.gameScores[g.number]=netA;          // net pinfall per game
-          pa.pinfall+=netA;                       // total WITH handicap
-          pa.highest=Math.max(pa.highest,netA);   // track highest net game
-          pa.games++;
-        }
+  // Sorted primarily by pinfall (highest to lowest), then highest game, then name
+  return players.sort((a,b)=>b.pinfall-a.pinfall||b.highest-a.highest||a.name.localeCompare(b.name));
+}
         if(pb){
           const netA=o.a+A.bowlers[pos].handicap, netB=o.b+B.bowlers[pos].handicap;
           pb.points += netB>netA?2:netB===netA?1:0;
