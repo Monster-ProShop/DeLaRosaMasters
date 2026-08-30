@@ -97,19 +97,22 @@
     return players.sort((a,b)=>b.points-a.points||b.pinfall-a.pinfall||b.highest-a.highest||a.name.localeCompare(b.name));
   }
 
-  // Find the single highest net game score across ALL players / ALL categories.
-  // Returns { playerId, gameNumber, value } or null if no games played.
-  function findGlobalHighGame(players, totalGamesCount){
-    let best=null;
+  // Find the highest net game score PER GAME across ALL players / ALL categories.
+  // Returns an object mapping game number -> max net score: { [gNum]: maxNet }.
+  // Any player whose net score in a given game equals maxNet gets a gold circle,
+  // which naturally handles ties (multiple circles per game).
+  function findHighGamePerGame(players, totalGamesCount){
+    const maxPerGame={};
     for(const p of players){
       for(let gNum=1; gNum<=totalGamesCount; gNum++){
         const v=p.gameScores[gNum];
-        if(v!==undefined && (best===null || v>best.value)){
-          best={ playerId:p.id, gameNumber:gNum, value:v };
+        if(v===undefined) continue;
+        if(maxPerGame[gNum]===undefined || v>maxPerGame[gNum]){
+          maxPerGame[gNum]=v;
         }
       }
     }
-    return best;
+    return maxPerGame;
   }
 
   function renderTeamStandings(){
@@ -145,7 +148,7 @@
     const groups=[['Male','Men'],['Female','Women'],['Male Senior','Senior Men'],['Female Senior','Senior Women']];
     const p=calculatePlayerStandings();
     const totalGamesCount = state.games.length;
-    const globalHigh = findGlobalHighGame(p, totalGamesCount);
+    const highPerGame = findHighGamePerGame(p, totalGamesCount);
 
     document.getElementById('standingsContent').innerHTML=groups.map(([g,label])=>{
       const rows=p.filter(x=>x.gender===g);
@@ -157,10 +160,10 @@
             ${rows.map((x,i)=>{
               const gameCells = Array.from({length: totalGamesCount}, (_, gIdx)=>{
                 const gNum=gIdx+1, net=x.gameScores[gNum];
-                const isHigh = globalHigh && globalHigh.playerId===x.id && globalHigh.gameNumber===gNum;
+                const isHigh = net!==undefined && highPerGame[gNum]!==undefined && net===highPerGame[gNum];
                 const cell = net!==undefined ? net : '—';
                 return isHigh
-                  ? `<td class="center"><span class="high-game-circle" title="Highest game across all categories">${cell}</span></td>`
+                  ? `<td class="center"><span class="high-game-circle" title="Highest net game in this game across all categories (ties shown)">${cell}</span></td>`
                   : `<td class="center">${cell}</td>`;
               }).join('');
               const totalHdcp = x.games * x.handicap;
@@ -169,7 +172,7 @@
           </tbody></table></div>
         ` : '<div class="empty">No players in this category.</div>'}
       </div>`;
-    }).join('') + (globalHigh ? `<p class="small muted" style="margin-top:10px">Game columns show net pinfall (scratch + handicap). The <span class="high-game-circle" style="display:inline-flex;width:auto;height:auto;padding:2px 10px;font-size:.78rem">gold circle</span> marks the highest single net game across all categories (${globalHigh.value}).</p>` : '<p class="small muted" style="margin-top:10px">Game columns show net pinfall (scratch + handicap). Pinfall totals include handicap.</p>');
+    }).join('') + (Object.keys(highPerGame).length ? `<p class="small muted" style="margin-top:10px">Game columns show net pinfall (scratch + handicap). The <span class="high-game-circle" style="display:inline-flex;width:auto;height:auto;padding:2px 10px;font-size:.78rem">gold circle</span> marks the highest net game in each game across all categories (ties are all highlighted).</p>` : '<p class="small muted" style="margin-top:10px">Game columns show net pinfall (scratch + handicap). Pinfall totals include handicap.</p>');
   }
 
   function renderAll(){
