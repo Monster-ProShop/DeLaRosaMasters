@@ -256,11 +256,11 @@ body.is-admin div.admin-only{display:flex !important}
         
         <div class="row" style="margin-bottom: 16px;">
           <div>
-            <label for="totalLanesInput">Available Lanes (1-100)</label>
+            <label for="totalLanesInput">Lane Quantity (Available Lanes 1-100)</label>
             <input id="totalLanesInput" type="number" min="1" max="100" value="30">
           </div>
           <div>
-            <label for="teamShiftSelect">Assigned Shift</label>
+            <label for="teamShiftSelect">Shift Selection</label>
             <select id="teamShiftSelect">
               <option value="1">Shift 1</option>
               <option value="2">Shift 2</option>
@@ -283,7 +283,7 @@ body.is-admin div.admin-only{display:flex !important}
       
       <div class="card span4">
         <h3>Shift Capacity Rules</h3>
-        <div class="pair-box"><b>Lane Limit & Teams</b><br><span class="muted">Each shift is limited to the quantity of available lanes (e.g., 30 lanes = max 30 teams per shift).</span></div>
+        <div class="pair-box"><b>Lane Limit & Teams</b><br><span class="muted">Each shift respects the quantity of teams based on the designated quantity of lanes (e.g., 30 lanes = max 30 teams per shift).</span></div>
         <div class="pair-box"><b>Team Average</b><br><span class="muted">Sum of 3 averages must be ≤ 630.</span></div>
         <div class="pair-box"><b>Handicap Caps</b><br><span class="muted">210 − average, minimum 0.<br>Max 40 (Female/Senior), 35 (Male).</span></div>
       </div>
@@ -712,20 +712,28 @@ function renderMatch(m,map){
     <div class="score-grid" style="margin-bottom:6px">
       <div><b>P${pos+1}</b><br><span class="small muted">${esc(as[pos].name)} (${as[pos].handicap}) vs ${esc(bs[pos].name)} (${bs[pos].handicap})</span></div>
       <div><input type="number" min="0" max="300" id="s_${m.id}_a_${pos}" value="${getBowlerScore(m,pos,'a')}" ${canEdit?'':'disabled'}></div>
-      <div class="center" id="thdcp_${m.id}_a_${pos}" style="font-weight:700; font-size:0.9rem;">—</div>
+      <div class="center" id="thdcp_${m.id}_a_${pos}" style="font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+        <span id="thdcp_val_${m.id}_a_${pos}">—</span><span id="p_a_${m.id}_${pos}" style="font-size:1.1rem;"></span>
+      </div>
       <div><input type="number" min="0" max="300" id="s_${m.id}_b_${pos}" value="${getBowlerScore(m,pos,'b')}" ${canEdit?'':'disabled'}></div>
-      <div class="center" id="thdcp_${m.id}_b_${pos}" style="font-weight:700; font-size:0.9rem;">—</div>
-      <div class="center" id="p_${m.id}_${pos}" style="font-size:1.1rem;">${getBowlerPointSymbol(m,pos,A,B,as,bs)}</div>
+      <div class="center" id="thdcp_${m.id}_b_${pos}" style="font-weight:700; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+        <span id="thdcp_val_${m.id}_b_${pos}">—</span><span id="p_b_${m.id}_${pos}" style="font-size:1.1rem;"></span>
+      </div>
+      <div class="center" id="p_${m.id}_${pos}" style="font-size:1.1rem;"></div>
     </div>`).join('')}
     
     <div class="pair-box">
       <div class="score-grid">
         <div><b>Team Total Scratch & HDCP</b></div>
         <div><input type="number" id="ts_${m.id}_a" value="${m.teamScoreA??''}" readonly placeholder="Scratch"></div>
-        <div class="center" id="tots_${m.id}_a" style="font-weight:800; color:var(--gold);">—</div>
+        <div class="center" id="tots_${m.id}_a" style="font-weight:800; color:var(--gold); display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span id="tots_val_${m.id}_a">—</span><span id="tp_a_${m.id}" style="font-size:1.2rem;"></span>
+        </div>
         <div><input type="number" id="ts_${m.id}_b" value="${m.teamScoreB??''}" readonly placeholder="Scratch"></div>
-        <div class="center" id="tots_${m.id}_b" style="font-weight:800; color:var(--gold);">—</div>
-        <div class="center" id="tp_${m.id}" style="font-size:1.2rem;">${m.teamScoreA!==null?teamPointSymbol(m,A,B):'—'}</div>
+        <div class="center" id="tots_${m.id}_b" style="font-weight:800; color:var(--gold); display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span id="tots_val_${m.id}_b">—</span><span id="tp_b_${m.id}" style="font-size:1.2rem;"></span>
+        </div>
+        <div class="center" id="tp_${m.id}" style="font-size:1.2rem;"></div>
       </div>
     </div>
     <div class="actions" style="justify-content:flex-end;margin-top:10px">${canEdit?`<button class="btn-primary" onclick="saveMatch('${m.id}')">Save Match</button>`:''}</div>
@@ -781,20 +789,6 @@ function getBowlerScore(m,pos,side){
   const o=m.bowlers.find(x=>x.pos===pos); return o ? (side==='a'?o.a:o.b) : '';
 }
 
-function getBowlerPointSymbol(m,pos,A,B,as,bs){
-  const o=m.bowlers.find(x=>x.pos===pos); if(!o)return '—';
-  const ha=o.a + as[pos].handicap, hb=o.b + bs[pos].handicap;
-  if(ha===hb) return '🤝';
-  return ha>hb ? '🟢 vs ❌' : '❌ vs 🟢';
-}
-
-function teamPointSymbol(m,A,B){
-  if(m.teamScoreA===null)return '—';
-  const ha=m.teamScoreA+teamTotals(A).hdcp, hb=m.teamScoreB+teamTotals(B).hdcp;
-  if(ha===hb) return '🤝';
-  return ha>hb ? '🟢🟢 vs ❌❌' : '❌❌ vs 🟢🟢';
-}
-
 function refreshMatchPreview(id){
   const game=state.games.find(g=>g.number===state.currentGame), m=game?.matches.find(x=>x.id===id); if(!m)return;
   const map=teamMap(), A=map[m.aId], B=map[m.bId];
@@ -812,20 +806,34 @@ function refreshMatchPreview(id){
     const haTotal = a + as[pos].handicap;
     const hbTotal = b + bs[pos].handicap;
     
-    const elA = document.getElementById(`thdcp_${id}_a_${pos}`);
-    const elB = document.getElementById(`thdcp_${id}_b_${pos}`);
-    if(elA) elA.textContent = aInp?.value!=='' ? haTotal : '—';
-    if(elB) elB.textContent = bInp?.value!=='' ? hbTotal : '—';
+    const elAVal = document.getElementById(`thdcp_val_${id}_a_${pos}`);
+    const elBVal = document.getElementById(`thdcp_val_${id}_b_${pos}`);
+    if(elAVal) elAVal.textContent = aInp?.value!=='' ? haTotal : '—';
+    if(elBVal) elBVal.textContent = bInp?.value!=='' ? hbTotal : '—';
     
-    const out=document.getElementById(`p_${id}_${pos}`);
-    if(out && aInp?.value!=='' && bInp?.value!==''){
-      out.textContent = haTotal===hbTotal ? '🤝' : (haTotal>hbTotal ? '🟢 vs ❌' : '❌ vs 🟢');
+    const pA = document.getElementById(`p_a_${id}_${pos}`);
+    const pB = document.getElementById(`p_b_${id}_${pos}`);
+    
+    if(aInp?.value!=='' && bInp?.value!==''){
+      if(haTotal === hbTotal){
+        if(pA) pA.textContent = '🤝';
+        if(pB) pB.textContent = '🤝';
+      } else if(haTotal > hbTotal){
+        if(pA) pA.textContent = '🟢';
+        if(pB) pB.textContent = '❌';
+      } else {
+        if(pA) pA.textContent = '❌';
+        if(pB) pB.textContent = '🟢';
+      }
+    } else {
+      if(pA) pA.textContent = '';
+      if(pB) pB.textContent = '';
     }
   }
   
   const ea=document.getElementById(`ts_${id}_a`), eb=document.getElementById(`ts_${id}_b`);
-  const totsA = document.getElementById(`tots_${id}_a`), totsB = document.getElementById(`tots_${id}_b`);
-  const tp=document.getElementById(`tp_${id}`);
+  const totsAVal = document.getElementById(`tots_val_${id}_a`), totsBVal = document.getElementById(`tots_val_${id}_b`);
+  const tpA = document.getElementById(`tp_a_${id}`), tpB = document.getElementById(`tp_b_${id}`);
   
   if(ea) ea.value=ta; 
   if(eb) eb.value=tb;
@@ -835,11 +843,23 @@ function refreshMatchPreview(id){
   const teamSumA = ta + teamHdcpA;
   const teamSumB = tb + teamHdcpB;
   
-  if(totsA) totsA.textContent = ea?.value!=='' ? teamSumA : '—';
-  if(totsB) totsB.textContent = eb?.value!=='' ? teamSumB : '—';
+  if(totsAVal) totsAVal.textContent = ea?.value!=='' ? teamSumA : '—';
+  if(totsBVal) totsBVal.textContent = eb?.value!=='' ? teamSumB : '—';
   
-  if(tp){
-    tp.textContent = (ea?.value!=='' && eb?.value!=='') ? (teamSumA===teamSumB ? '🤝' : (teamSumA>teamSumB ? '🟢🟢 vs ❌❌' : '❌❌ vs 🟢🟢')) : '—';
+  if(ea?.value!=='' && eb?.value!==''){
+    if(teamSumA === teamSumB){
+      if(tpA) tpA.textContent = '🤝';
+      if(tpB) tpB.textContent = '🤝';
+    } else if(teamSumA > teamSumB){
+      if(tpA) tpA.textContent = '🟢🟢';
+      if(tpB) tpB.textContent = '❌❌';
+    } else {
+      if(tpA) tpA.textContent = '❌❌';
+      if(tpB) tpB.textContent = '🟢🟢';
+    }
+  } else {
+    if(tpA) tpA.textContent = '';
+    if(tpB) tpB.textContent = '';
   }
 }
 
