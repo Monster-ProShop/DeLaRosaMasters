@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Team Registration — De La Rosa Masters</title>
+<link rel="stylesheet" href="app.css" />
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+<div id="header-host"></div>
+<main>
+  <section id="registration" class="panel active">
+    <div class="grid">
+      <div class="card span8">
+        <h2>Team Registration & Lane Settings</h2>
+        <p class="muted">Configure available lanes (1–100), assign each team to a shift (1, 2, or 3), and register teams (max 3 bowlers per team, total avg ≤ 630).</p>
+
+        <div class="row" style="margin-bottom: 16px;">
+          <div>
+            <label for="totalLanesInput">Lane Quantity (Available Lanes 1-100)</label>
+            <input id="totalLanesInput" type="number" min="1" max="100" value="30">
+          </div>
+          <div>
+            <label for="teamShiftSelect">Shift Selection</label>
+            <select id="teamShiftSelect">
+              <option value="1">Shift 1</option>
+              <option value="2">Shift 2</option>
+              <option value="3">Shift 3</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div><label for="teamName">Team name</label><input id="teamName" placeholder="Example: Strike Force"></div>
+          <div style="flex:0 0 180px"><label for="teamCaptain">Optional contact</label><input id="teamCaptain" placeholder="Captain / contact"></div>
+        </div>
+        <div id="teamAlert"></div>
+        <div id="bowlerInputs"></div>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn-primary" id="addTeamBtn">Register Team</button>
+          <button class="btn-secondary" id="clearFormBtn">Clear Form</button>
+        </div>
+      </div>
+
+      <div class="card span4">
+        <h3>Shift Capacity Rules</h3>
+        <div class="pair-box"><b>Lane Limit & Teams</b><br><span class="muted">Each shift respects the quantity of teams based on the designated quantity of lanes (e.g., 30 lanes = max 30 teams per shift).</span></div>
+        <div class="pair-box"><b>Team Average</b><br><span class="muted">Sum of 3 averages must be ≤ 630.</span></div>
+        <div class="pair-box"><b>Handicap Caps</b><br><span class="muted">210 − average, minimum 0.<br>Max 40 (Female/Senior), 35 (Male).</span></div>
+      </div>
+
+      <div class="card span12 admin-only" style="border-color: var(--ok); background: rgba(32, 224, 112, 0.05);">
+        <h3 style="color: var(--ok)">🧪 Testing Environment</h3>
+        <div class="row" style="align-items:end;">
+          <div>
+            <label for="dummyCount" style="color:var(--ok)">Generate Random Teams</label>
+            <input id="dummyCount" type="number" min="1" max="90" value="30" style="border-color:var(--ok);">
+          </div>
+          <div>
+            <button class="btn-primary" style="background:var(--ok);color:#000;width:100%" onclick="generateDummyTeams()">Generate Dummy Teams</button>
+          </div>
+          <div class="muted small" style="flex: 2 1 300px;">
+            Automatically fills available shifts up to lane capacity constraints.
+          </div>
+        </div>
+      </div>
+
+      <div class="card span12">
+        <div class="actions" style="justify-content:space-between"><h3 style="margin:0">Registered Teams</h3><span id="teamCountBadge" class="badge">0 teams</span></div>
+        <div id="teamsTable"></div>
+      </div>
+
+      <div class="card span12" id="editPanel" style="display:none; border-color: var(--gold);">
+        <div class="actions" style="justify-content:space-between">
+          <h2 style="margin:0">Edit Team</h2>
+          <button class="btn-ghost" onclick="cancelEdit()">Cancel</button>
+        </div>
+        <div id="editFormBody"></div>
+      </div>
+    </div>
+  </section>
+  <footer>Data is stored locally in browser storage. De La Rosa Masters • Ilusión Bowl Edition</footer>
+</main>
+
+<script src="app.js"></script>
+<script>
+(function(){
+  const { getState, save, esc, handicap, totalAvg } = App;
+
+  function initBowlerForm(){
+    const genders=['Male','Female','Male Senior','Female Senior'];
+    document.getElementById('bowlerInputs').innerHTML=[0,1,2].map(i=>`
+      <div class="bowler-row">
+        <div><label>Bowler ${i+1} name</label><input class="bn" data-i="${i}" placeholder="Name"></div>
+        <div><label>Average</label><input class="ba" data-i="${i}" type="number" min="0" step="1" placeholder="0"></div>
+        <div><label>Gender</label><select class="bg" data-i="${i}">${genders.map(g=>`<option>${g}</option>`).join('')}</select></div>
+        <div><label>Handicap</label><input class="bh" data-i="${i}" readonly value="0"></div>
+        <div><label>Order</label><input class="bo" data-i="${i}" readonly value="${i+1}"></div>
+        <div><label>Preview</label><div class="small muted" id="prev${i}">Enter average and gender</div></div>
+      </div>`).join('');
+    document.querySelectorAll('.ba,.bg').forEach(el=>el.addEventListener('input', updateFormPreview));
+    updateFormPreview();
+  }
+
+  function updateFormPreview(){
+    const bs=[0,1,2].map(i=>{
+      const avg=Number(document.querySelector(`.ba[data-i="${i}"]`).value)||0;
+      const g=document.querySelector(`.bg[data-i="${i}"]`).value;
+      return {i,avg,g,h:handicap(avg,g)};
+    });
+    const sorted=[...bs].sort((a,b)=>a.avg-b.avg||a.i-b.i);
+    sorted.forEach((b,idx)=>{
+      const bh=document.querySelector(`.bh[data-i="${b.i}"]`);
+      const bo=document.querySelector(`.bo[data-i="${b.i}"]`);
+      const prev=document.getElementById(`prev${b.i}`);
+      if(bh) bh.value=b.h;
+      if(bo) bo.value=idx+1;
+      if(prev) prev.textContent=`Handicap ${b.h} • Position ${idx+1}`;
+    });
+    const sum=bs.reduce((a,b)=>a+b.avg,0);
+    const box=document.getElementById('teamAlert');
+    box.innerHTML=sum>630?`<div class="alert alert-danger">ERROR: Team average is <b>${sum}</b>. Maximum allowed is <b>630</b>.</div>`:(sum>0?`<div class="alert alert-ok">Team average total: <b>${sum}</b> / 630</div>`:'');
+  }
+
+  function clearForm(){
+    document.getElementById('teamName').value='';
+    document.getElementById('teamCaptain').value='';
+    document.querySelectorAll('.bn,.ba').forEach(x=>x.value='');
+    initBowlerForm();
+  }
+
+  function showTeamAlert(msg,type){
+    document.getElementById('teamAlert').innerHTML=`<div class="alert alert-${type==='danger'?'danger':'ok'}">${esc(msg)}</div>`;
+  }
+
+  function registerTeam(){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    const totalLanes = Number(document.getElementById('totalLanesInput').value) || 30;
+    state.settings.totalLanes = totalLanes;
+
+    const shift = Number(document.getElementById('teamShiftSelect').value);
+    const shiftCount = state.teams.filter(t => (t.shift || 1) === shift).length;
+    if(shiftCount >= totalLanes){
+      alert(`Shift ${shift} has reached the maximum capacity of ${totalLanes} teams based on available lanes.`);
+      return;
+    }
+
+    const name=document.getElementById('teamName').value.trim();
+    const contact=document.getElementById('teamCaptain').value.trim();
+    const bowlers=[0,1,2].map(i=>({
+      name:document.querySelector(`.bn[data-i="${i}"]`).value.trim(),
+      average:Number(document.querySelector(`.ba[data-i="${i}"]`).value),
+      gender:document.querySelector(`.bg[data-i="${i}"]`).value
+    }));
+    if(!name){return showTeamAlert('Please enter a team name.','danger')}
+    if(bowlers.some(b=>!b.name || !Number.isFinite(b.average))){return showTeamAlert('Please enter all 3 bowler names and averages.','danger')}
+    if(bowlers.some(b=>b.average<0)){return showTeamAlert('Average cannot be negative.','danger')}
+    const sum=bowlers.reduce((a,b)=>a+b.average,0);
+    if(sum>630){return showTeamAlert(`ERROR: Team average is ${sum}. Maximum is 630.`,'danger')}
+    const sorted=bowlers.sort((a,b)=>a.average-b.average);
+    sorted.forEach((b,idx)=>b.handicap=handicap(b.average,b.gender));
+
+    state.teams.push({id:crypto.randomUUID(), name, contact, shift, bowlers:sorted});
+    save(); clearForm(); renderTeams();
+  }
+
+  window.generateDummyTeams = function(){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    const count = parseInt(document.getElementById('dummyCount').value);
+    const totalLanes = Number(document.getElementById('totalLanesInput').value) || 30;
+    state.settings.totalLanes = totalLanes;
+
+    if(isNaN(count) || count < 1 || count > 90){ alert('Please select a number of teams between 1 and 90.'); return; }
+
+    let tCounter = state.teams.length + 1;
+    let pCounter = (state.teams.length * 3) + 1;
+
+    for(let i=0; i<count; i++){
+      let currentShift = ((i % 3) + 1);
+      let shiftTeamsCount = state.teams.filter(t => t.shift === currentShift).length;
+      if(shiftTeamsCount >= totalLanes) continue;
+
+      let teamName = `Team${tCounter++}`;
+      let bowlers = [];
+      for(let b=0; b<3; b++){
+        let playerName = `Player${pCounter++}`;
+        let avg = Math.floor(Math.random() * (210 - 175 + 1)) + 175;
+        let rand = Math.random();
+        let gender = 'Male';
+        if(rand >= 0.95) gender = 'Female';
+        else if (rand >= 0.80) gender = 'Male Senior';
+        bowlers.push({ name: playerName, average: avg, gender: gender });
+      }
+      let sorted = bowlers.sort((a,b) => a.average - b.average);
+      sorted.forEach((bowler) => bowler.handicap = handicap(bowler.average, bowler.gender));
+      state.teams.push({id: crypto.randomUUID(), name: teamName, contact: 'Auto-Gen', shift: currentShift, bowlers: sorted});
+    }
+    save(); renderTeams();
+    alert(`Successfully generated dummy teams up to shift limits!`);
+  };
+
+  window.removeTeam = function(id){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    if(state.started){ alert('Cannot remove teams after tournament start.'); return; }
+    // If the team being removed is currently being edited, close the editor.
+    if(state.teams.find(t=>t.id===id)){
+      const editingId = document.getElementById('editPanel').getAttribute('data-edit-id');
+      if(editingId === id){ document.getElementById('editPanel').style.display='none'; }
+    }
+    state.teams = state.teams.filter(t=>t.id!==id);
+    save(); renderTeams();
+  };
+
+  /* ---------- Edit support ---------- */
+  let editingId = null;
+
+  window.editTeam = function(id){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    const t = state.teams.find(x=>x.id===id);
+    if(!t) return;
+    editingId = id;
+    const panel = document.getElementById('editPanel');
+    panel.setAttribute('data-edit-id', id);
+    panel.style.display = 'block';
+    const genders=['Male','Female','Male Senior','Female Senior'];
+
+    const bowlerRows = t.bowlers.map((b,i)=>`
+      <div class="edit-row">
+        <div><label>Bowler ${i+1} name</label><input id="ebn_${i}" value="${esc(b.name)}"></div>
+        <div><label>Average</label><input id="eba_${i}" type="number" min="0" value="${b.average}"></div>
+        <div><label>Gender</label><select id="ebg_${i}">${genders.map(g=>`<option ${g===b.gender?'selected':''}>${g}</option>`).join('')}</select></div>
+        <div><label>Handicap (auto)</label><input id="ebh_${i}" readonly value="${b.handicap}"></div>
+        <div><label>Order (auto)</label><input id="ebo_${i}" readonly value="${i+1}"></div>
+        <div class="small muted" id="ebprev_${i}">—</div>
+      </div>`).join('');
+
+    document.getElementById('editFormBody').innerHTML = `
+      <div class="row" style="margin-bottom:14px">
+        <div><label>Team name</label><input id="eTeamName" value="${esc(t.name)}"></div>
+        <div style="flex:0 0 180px"><label>Optional contact</label><input id="eTeamContact" value="${esc(t.contact||'')}"></div>
+        <div style="flex:0 0 160px"><label>Shift</label><select id="eTeamShift">
+          <option value="1" ${t.shift==1?'selected':''}>Shift 1</option>
+          <option value="2" ${t.shift==2?'selected':''}>Shift 2</option>
+          <option value="3" ${t.shift==3?'selected':''}>Shift 3</option>
+        </select></div>
+      </div>
+      <div id="editTeamAlert"></div>
+      ${bowlerRows}
+      <div class="actions" style="margin-top:12px">
+        <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+        <button class="btn-ghost" onclick="cancelEdit()">Cancel</button>
+      </div>`;
+
+    for(let i=0;i<3;i++){
+      document.getElementById(`eba_${i}`).addEventListener('input', ()=>refreshEditPreview());
+      document.getElementById(`ebg_${i}`).addEventListener('change', ()=>refreshEditPreview());
+    }
+    refreshEditPreview();
+    panel.scrollIntoView({behavior:'smooth', block:'center'});
+  };
+
+  function refreshEditPreview(){
+    const bs=[0,1,2].map(i=>{
+      const avg=Number(document.getElementById(`eba_${i}`).value)||0;
+      const g=document.getElementById(`ebg_${i}`).value;
+      return {i,avg,g,h:handicap(avg,g)};
+    });
+    const sorted=[...bs].sort((a,b)=>a.avg-b.avg||a.i-b.i);
+    sorted.forEach((b,idx)=>{
+      const bh=document.getElementById(`ebh_${b.i}`);
+      const bo=document.getElementById(`ebo_${b.i}`);
+      const prev=document.getElementById(`ebprev_${b.i}`);
+      if(bh) bh.value=b.h;
+      if(bo) bo.value=idx+1;
+      if(prev) prev.textContent=`Handicap ${b.h} • Position ${idx+1}`;
+    });
+    const sum=bs.reduce((a,b)=>a+b.avg,0);
+    const box=document.getElementById('editTeamAlert');
+    if(box) box.innerHTML = sum>630
+      ? `<div class="alert alert-danger">ERROR: Team average is <b>${sum}</b>. Maximum allowed is <b>630</b>.</div>`
+      : `<div class="alert alert-ok">Team average total: <b>${sum}</b> / 630</div>`;
+  }
+
+  window.saveEdit = function(){
+    if(!App.getIsAdmin()) return;
+    const state = getState();
+    const t = state.teams.find(x=>x.id===editingId);
+    if(!t){ cancelEdit(); return; }
+
+    const name=document.getElementById('eTeamName').value.trim();
+    const contact=document.getElementById('eTeamContact').value.trim();
+    const shift=Number(document.getElementById('eTeamShift').value);
+    if(!name){ showEditAlert('Please enter a team name.','danger'); return; }
+
+    const bowlers=[0,1,2].map(i=>({
+      name:document.getElementById(`ebn_${i}`).value.trim(),
+      average:Number(document.getElementById(`eba_${i}`).value),
+      gender:document.getElementById(`ebg_${i}`).value
+    }));
+    if(bowlers.some(b=>!b.name || !Number.isFinite(b.average))){ showEditAlert('Please enter all 3 bowler names and averages.','danger'); return; }
+    if(bowlers.some(b=>b.average<0)){ showEditAlert('Average cannot be negative.','danger'); return; }
+    const sum=bowlers.reduce((a,b)=>a+b.average,0);
+    if(sum>630){ showEditAlert(`ERROR: Team average is ${sum}. Maximum is 630.`,'danger'); return; }
+
+    // Capacity check if shift changed
+    const totalLanes = state.settings.totalLanes;
+    if(shift !== (t.shift||1)){
+      const othersInShift = state.teams.filter(x=>x.id!==t.id && (x.shift||1)===shift).length;
+      if(othersInShift >= totalLanes){
+        showEditAlert(`Shift ${shift} is full (${totalLanes} teams max). Choose a different shift.`,'danger');
+        return;
+      }
+    }
+
+    const sorted=bowlers.sort((a,b)=>a.average-b.average);
+    sorted.forEach(b=>b.handicap=handicap(b.average,b.gender));
+
+    t.name=name; t.contact=contact; t.shift=shift; t.bowlers=sorted;
+    save(); cancelEdit(); renderTeams();
+  };
+
+  function showEditAlert(msg,type){
+    const box=document.getElementById('editTeamAlert');
+    if(box) box.innerHTML=`<div class="alert alert-${type==='danger'?'danger':'ok'}">${esc(msg)}</div>`;
+  }
+
+  window.cancelEdit = function(){
+    editingId=null;
+    const panel=document.getElementById('editPanel');
+    panel.style.display='none';
+    panel.removeAttribute('data-edit-id');
+    document.getElementById('editFormBody').innerHTML='';
+  };
+
+  /* ---------- Rendering ---------- */
+  function renderTeams(){
+    const state = getState();
+    const holder=document.getElementById('teamsTable');
+    document.getElementById('teamCountBadge').textContent=`${state.teams.length} team${state.teams.length===1?'':'s'}`;
+
+    if(!state.teams.length){
+      holder.innerHTML='<div class="empty">No teams registered yet.</div>';
+      return;
+    }
+    const canManage = App.getIsAdmin() && !state.started;
+    const actionCell = canManage
+      ? `<th>Actions</th>`
+      : (App.getIsAdmin() ? `<th>Actions</th>` : '');
+
+    holder.innerHTML = `<table><thead><tr><th>#</th><th>Team</th><th>Shift</th><th>Bowler 1</th><th>Bowler 2</th><th>Bowler 3</th><th>Avg Total</th><th>HDCP Total</th>${actionCell}</tr></thead><tbody>${
+      state.teams.map((t,i)=>{
+        const actions = App.getIsAdmin()
+          ? `<td class="actions">
+              <button class="btn-ghost" onclick="editTeam('${t.id}')">Edit</button>
+              <button class="btn-danger" onclick="removeTeam('${t.id}')" ${state.started?'disabled title="Tournament started"':''}>Remove</button>
+            </td>` : '';
+        return `<tr>
+          <td>${i+1}</td>
+          <td><b>${esc(t.name)}</b><div class="small muted">${esc(t.contact||'')}</div></td>
+          <td>Shift ${t.shift||1}</td>
+          ${t.bowlers.map(b=>`<td>${esc(b.name)}<br><span class="small muted">${b.average} avg • ${b.handicap} hdcp</span></td>`).join('')}
+          <td>${totalAvg(t)}</td>
+          <td>${t.bowlers.reduce((a,b)=>a+b.handicap,0)}</td>
+          ${actions}
+        </tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }
+
+  function renderAll(){
+    renderTeams();
+    App.updateHeaderStatus();
+  }
+
+  /* ---------- Boot ---------- */
+  App.mountPage('registration');
+  document.getElementById('totalLanesInput').value = getState().settings.totalLanes;
+  document.getElementById('totalLanesInput').addEventListener('change', ()=>{
+    const v = Number(document.getElementById('totalLanesInput').value)||30;
+    if(v<1) return; if(v>100) return;
+    getState().settings.totalLanes = v; save(); renderTeams();
+  });
+  initBowlerForm();
+  document.getElementById('addTeamBtn').onclick=registerTeam;
+  document.getElementById('clearFormBtn').onclick=clearForm;
+  window.onAuthSuccess = renderAll;
+  window.onStateSaved = renderAll;
+  renderAll();
+})();
+</script>
+</body>
+</html>

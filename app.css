@@ -1,0 +1,200 @@
+/* De La Rosa Masters — Shared stylesheet (app.css) */
+:root{
+  --bg-gradient: radial-gradient(circle at center, #ff2a1a 0%, #b80000 65%, #6e0000 100%);
+  --card-bg: rgba(18, 18, 20, 0.95);
+  --card-border: #ffd700;
+  --ink: #ffffff;
+  --muted: #d0d7de;
+  --line: #3d3d45;
+  --accent: #ff2a1a;
+  --accent-hover: #d61100;
+  --gold: #ffd700;
+  --danger: #ff4d4d;
+  --dangerbg: #4a0d0d;
+  --ok: #20e070;
+  --okbg: #0d381e;
+  --warn: #ffcc00;
+  --warnbg: #423500;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --radius: 14px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  color:var(--ink);
+  min-height: 100vh;
+}
+header{
+  background: #000000;
+  color:#fff;
+  padding:18px 24px;
+  position:sticky;
+  top:0;
+  z-index:20;
+  box-shadow:0 4px 20px rgba(0,0,0,.6);
+  border-bottom: 3px solid var(--gold);
+}
+.header-inner{max-width:1400px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand-wrapper{display:flex;align-items:center;gap:14px}
+.brand-logo{height:54px;width:auto;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
+.brand{font-size:1.4rem;font-weight:900;letter-spacing:0.04em;color:#fff;text-transform:uppercase}
+.brand span{color:var(--gold)}
+.subtitle{font-size:.88rem;color:var(--muted);margin-top:2px}
+
+main{max-width:1400px;margin:22px auto;padding:0 18px 50px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{
+  background:var(--card-bg);
+  border:1.5px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:20px;
+  backdrop-filter: blur(8px);
+}
+.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}
+h2,h3{margin:0 0 12px;color:var(--gold);text-transform:uppercase;letter-spacing:0.02em}
+.muted{color:var(--muted)}
+label{display:block;font-size:.86rem;font-weight:700;margin:0 0 6px;color:var(--gold)}
+input,select,button{font:inherit}
+input,select{
+  width:100%;
+  padding:10px 11px;
+  border:1px solid #444;
+  border-radius:99px;
+  background:#222;
+  color:#fff;
+}
+input:focus, select:focus{outline:2px solid var(--gold);border-color:transparent}
+button{border:0;border-radius:9px;padding:10px 16px;font-weight:800;cursor:pointer;text-transform:uppercase}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 10px rgba(255,42,26,0.4)}.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:#333;color:#fff;border:1px solid #555}.btn-secondary:hover{background:#444}
+.btn-danger{background:var(--danger);color:#fff}.btn-ghost{background:transparent;border:1px solid var(--line);color:#fff}
+.btn-ok{background:var(--ok);color:#000}
+.actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.row>*{flex:1 1 150px}
+.bowler-row{display:grid;grid-template-columns:1.6fr .6fr 1fr .55fr .55fr 1.1fr;gap:10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:10px;background:#18181c;margin:9px 0}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:999px;background:#222;color:var(--gold);border:1px solid var(--gold);font-size:.76rem;font-weight:800}
+.alert{padding:12px 14px;border-radius:10px;margin:10px 0;font-weight:700}
+.alert-danger{background:var(--dangerbg);color:var(--danger);border:1px solid var(--danger)}
+.alert-ok{background:var(--okbg);color:var(--ok);border:1px solid var(--ok)}
+.alert-warn{background:var(--warnbg);color:var(--warn);border:1px solid var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:.93rem}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}th{font-size:.78rem;text-transform:uppercase;color:var(--gold);letter-spacing:.04em}
+.right{text-align:right}.center{text-align:center}
+.small{font-size:.8rem}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+.pair-box{padding:10px;border:1px dashed var(--gold);border-radius:10px;margin-top:9px;background:#18181c}
+footer{color:#fff;font-size:.8rem;text-align:center;margin-top:18px;text-shadow:0 1px 2px #000}
+
+/* Auth modal */
+#authModal{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  backdrop-filter: blur(10px);
+}
+.auth-card{
+  background:#141416;
+  border:2px solid var(--gold);
+  border-radius:16px;
+  padding:32px;
+  width:90%;
+  max-width:420px;
+  text-align:center;
+  box-shadow:0 10px 40px rgba(0,0,0,0.8);
+}
+.role-btn{
+  width:100%;
+  margin:8px 0;
+  padding:14px;
+  font-size:1rem;
+}
+
+/* Admin visibility */
+.admin-only{display:none !important}
+body.is-admin .admin-only{display:block !important}
+body.is-admin button.admin-only{display:inline-block !important}
+body.is-admin div.admin-only{display:flex !important}
+
+/* FAB buttons (current game) */
+.fab-container {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1000;
+}
+.fab {
+  border: 2px solid var(--gold);
+  border-radius: 99px;
+  padding: 14px 20px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+  transition: transform 0.2s ease, background 0.2s ease;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.fab:hover { transform: translateY(-3px); }
+.fab-random { background: var(--okbg); color: var(--ok); border-color: var(--ok); }
+.fab-save { background: var(--accent); color: #fff; }
+
+/* Match cards (current game) */
+.match-card{border:1px solid var(--gold);border-radius:12px;margin:12px 0;overflow:hidden;background:#141416}
+.match-head{background:#000;padding:11px 13px;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
+.match-body{padding:12px}
+.score-grid{display:grid;grid-template-columns:1.2fr repeat(4, minmax(65px,1fr)) 1.2fr;gap:8px;align-items:center}
+.score-grid input{padding:8px;text-align:center}
+
+/* KPIs (standings) */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:#18181c;border:1px solid var(--gold);border-radius:11px;padding:12px;text-align:center}
+.kpi .big{font-size:1.65rem;font-weight:900;color:#fff}.kpi .small{font-size:.76rem;color:var(--gold);text-transform:uppercase}
+
+/* Landing page cards */
+.landing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.landing-card{
+  background:var(--card-bg);
+  border:2px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:26px;
+  backdrop-filter:blur(8px);
+  text-decoration:none;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.landing-card:hover{transform:translateY(-5px);border-color:var(--gold);box-shadow:0 14px 34px rgba(0,0,0,.6)}
+.landing-card .ico{font-size:2.4rem}
+.landing-card h2{margin:0}
+.landing-card p{margin:0;color:var(--muted);font-size:.92rem;line-height:1.5}
+.landing-card .go{margin-top:auto;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.04em;font-size:.82rem}
+.landing-card.disabled{opacity:.55;cursor:not-allowed}
+.landing-card.disabled:hover{transform:none;border-color:var(--line)}
+
+/* Editable team rows (tournament setup edit) */
+.edit-row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr 1fr;gap:10px;align-items:end;padding:12px;border:1px solid var(--gold);border-radius:10px;background:#18181c;margin:9px 0}
+.edit-row input,.edit-row select{padding:8px 10px}
+
+@media(max-width:900px){
+  .span8,.span6,.span4{grid-column:span 12}
+  .bowler-row{grid-template-columns:1fr 1fr 1fr}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .score-grid{grid-template-columns:1fr repeat(4, 1fr) 1fr}
+  .edit-row{grid-template-columns:1fr 1fr}
+}
