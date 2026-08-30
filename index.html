@@ -901,17 +901,40 @@ function calculateTeamStandings(){
 
 function calculatePlayerStandings(){
   const map=teamMap(), players=[];
-  state.teams.forEach(t=>t.bowlers.forEach(b=>players.push({id:t.id+'|'+b.name,name:b.name,team:t.name,shift:t.shift||1,gender:b.gender,points:0,pinfall:0,highest:0,games:0})));
+  state.teams.forEach(t=>t.bowlers.forEach(b=>players.push({
+    id: t.id+'|'+b.name,
+    name: b.name,
+    team: t.name,
+    gender: b.gender,
+    handicap: b.handicap,
+    points: 0,
+    pinfall: 0,
+    highest: 0,
+    games: 0,
+    gameScores: {}
+  })));
   const sm=Object.fromEntries(players.map(p=>[p.id,p]));
   for(const g of state.games) for(const m of g.matches){
     if(!m.completed)continue; const A=map[m.aId], B=map[m.bId];
     if(!A || !B) continue;
     m.bowlers.forEach((o,pos)=>{
       const pa=sm[m.aId+'|'+A.bowlers[pos].name], pb=sm[m.bId+'|'+B.bowlers[pos].name];
-      if(!pa || !pb) return;
-      const aa=o.a+A.bowlers[pos].handicap, bb=o.b+B.bowlers[pos].handicap;
-      pa.points += aa>bb?2:aa===bb?1:0; pb.points += bb>aa?2:bb===aa?1:0;
-      pa.pinfall+=o.a; pb.pinfall+=o.b; pa.highest=Math.max(pa.highest,o.a); pb.highest=Math.max(pb.highest,o.b); pa.games++; pb.games++;
+      if(pa){
+        const aa=o.a+A.bowlers[pos].handicap, bb=o.b+B.bowlers[pos].handicap;
+        pa.points += aa>bb?2:aa===bb?1:0;
+        pa.pinfall+=o.a;
+        pa.highest=Math.max(pa.highest,o.a);
+        pa.games++;
+        pa.gameScores[g.number] = o.a;
+      }
+      if(pb){
+        const aa=o.a+A.bowlers[pos].handicap, bb=o.b+B.bowlers[pos].handicap;
+        pb.points += bb>aa?2:bb===aa?1:0;
+        pb.pinfall+=o.b;
+        pb.highest=Math.max(pb.highest,o.b);
+        pb.games++;
+        pb.gameScores[g.number] = o.b;
+      }
     });
   }
   return players.sort((a,b)=>b.points-a.points||b.pinfall-a.pinfall||b.highest-a.highest||a.name.localeCompare(b.name));
@@ -932,9 +955,53 @@ function renderPlayerStandings(){
   if(!state.teams.length){document.getElementById('standingsContent').innerHTML='<div class="empty">No registered teams.</div>';return}
   const groups=[['Male','Men'],['Female','Women'],['Male Senior','Senior Men'],['Female Senior','Senior Women']];
   const p=calculatePlayerStandings();
+  const totalGamesCount = state.games.length;
+  
   document.getElementById('standingsContent').innerHTML=groups.map(([g,label])=>{
     const rows=p.filter(x=>x.gender===g);
-    return `<div class="card" style="box-shadow:none;margin-bottom:12px"><h3>${label} (All Shifts)</h3>${rows.length?`<table><thead><tr><th>Pos</th><th>Player</th><th>Team</th><th>Shift</th><th>Points</th><th>Pinfall</th><th>Highest Game</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.team)}</td><td>Shift ${x.shift}</td><td>${x.points}</td><td>${x.pinfall}</td><td>${x.highest}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No players in this category.</div>'}</div>`;
+    const gameHeaders = Array.from({length: totalGamesCount}, (_, i) => `<th>G${i+1}</th>`).join('');
+    
+    return `<div class="card" style="box-shadow:none;margin-bottom:12px">
+      <h3>${label}</h3>
+      ${rows.length ? `
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Player</th>
+                <th>Team</th>
+                ${gameHeaders}
+                <th>Points</th>
+                <th>Total HDCP</th>
+                <th>Pinfall</th>
+                <th>Highest Game</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((x,i)=>{
+                const gameCells = Array.from({length: totalGamesCount}, (_, gIdx) => {
+                  const gNum = gIdx + 1;
+                  const sc = x.gameScores[gNum];
+                  return `<td>${sc !== undefined ? sc : '—'}</td>`;
+                }).join('');
+                const totalHdcp = x.games * x.handicap;
+                return `<tr>
+                  <td>${i+1}</td>
+                  <td><b>${esc(x.name)}</b></td>
+                  <td>${esc(x.team)}</td>
+                  ${gameCells}
+                  <td><b>${x.points}</b></td>
+                  <td>${totalHdcp}</td>
+                  <td>${x.pinfall}</td>
+                  <td>${x.highest}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : '<div class="empty">No players in this category.</div>'}
+    </div>`;
   }).join('');
 }
 
@@ -963,3 +1030,4 @@ initBowlerForm();
 </script>
 </body>
 </html>
+```[cite: 5]
