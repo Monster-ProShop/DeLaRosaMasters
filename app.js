@@ -146,7 +146,7 @@
 
     const navHtml = navItems.map(it=>{
       const active = it.key === activePage ? ' active' : '';
-      const cls = 'tab' + (it.admin ? ' admin-only' : '') + active;
+      const cls = 'nav-item' + (it.admin ? ' admin-only' : '') + active;
       return `<a href="${it.href}" class="${cls}">${it.label}</a>`;
     }).join('');
 
@@ -194,12 +194,34 @@
           <button class="btn-danger admin-only" style="padding:6px 12px;font-size:0.75rem;" onclick="App.promptEraseEverything()">Erase & Start Over</button>
           <div id="roleBadge" class="badge" style="background:#000">Mode: User</div>
           <div id="headerStatus" class="badge">7 games • Shifts 1, 2, 3</div>
+          <button id="hamburgerBtn" class="hamburger" aria-label="Open navigation menu" aria-expanded="false" onclick="App.toggleNav(event)">
+            <span></span><span></span><span></span>
+          </button>
+          <div id="navDropdown" class="nav-dropdown">
+            <div class="nav-dropdown-inner">
+              ${navHtml}
+            </div>
+          </div>
         </div>
       </div>
-      <div class="header-inner" style="margin-top:10px">
-        <nav class="tabs" style="margin:0">${navHtml}</nav>
-      </div>
     </header>`;
+  }
+
+  /* ---------- Hamburger nav toggle ---------- */
+  function toggleNav(e){
+    if(e) e.stopPropagation();
+    const btn = document.getElementById('hamburgerBtn');
+    const dd = document.getElementById('navDropdown');
+    if(!btn || !dd) return;
+    const open = dd.classList.toggle('open');
+    btn.classList.toggle('active', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeNav(){
+    const btn = document.getElementById('hamburgerBtn');
+    const dd = document.getElementById('navDropdown');
+    if(dd) dd.classList.remove('open');
+    if(btn){ btn.classList.remove('active'); btn.setAttribute('aria-expanded','false'); }
   }
 
   function updateHeaderStatus(){
@@ -217,6 +239,15 @@
     // wire auth modal enter key
     const ap = document.getElementById('adminPass');
     if(ap) ap.addEventListener('keydown', e=>{ if(e.key==='Enter') loginAdmin(); });
+
+    // Close hamburger menu when clicking outside of it
+    document.addEventListener('click', (ev)=>{
+      const dd = document.getElementById('navDropdown');
+      const btn = document.getElementById('hamburgerBtn');
+      if(dd && dd.classList.contains('open') && btn && !btn.contains(ev.target) && !dd.contains(ev.target)){
+        closeNav();
+      }
+    });
 
     // Restore an admin session if previously granted in this browser session
     // (admin is session-scoped via sessionStorage flag to avoid exposing password)
@@ -257,6 +288,7 @@
     getIsAdmin, setIsAdmin,
     esc, handicap, totalAvg, teamTotals, playerOrder, teamMap,
     showAdminPrompt, selectUserRole, loginAdmin, promptEraseEverything,
+    toggleNav, closeNav,
     mountPage, updateHeaderStatus, defaultState
   };
 })();

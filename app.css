@@ -44,6 +44,68 @@ header{
 .brand span{color:var(--gold)}
 .subtitle{font-size:.88rem;color:var(--muted);margin-top:2px}
 
+/* Hamburger menu (top-right) */
+.hamburger{
+  display:inline-flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:5px;
+  width:42px;
+  height:42px;
+  padding:8px;
+  background:#1a1a1c;
+  border:1.5px solid var(--gold);
+  border-radius:9px;
+  cursor:pointer;
+  position:relative;
+  z-index:30;
+  transition:background .15s ease, border-color .15s ease;
+}
+.hamburger span{
+  display:block;
+  width:100%;
+  height:3px;
+  background:var(--gold);
+  border-radius:3px;
+  transition:transform .25s ease, opacity .2s ease;
+}
+.hamburger:hover{background:#26262a}
+.hamburger.active span:nth-child(1){transform:translateY(8px) rotate(45deg)}
+.hamburger.active span:nth-child(2){opacity:0}
+.hamburger.active span:nth-child(3){transform:translateY(-8px) rotate(-45deg)}
+
+.nav-dropdown{
+  display:none;
+  position:absolute;
+  top:calc(100% + 10px);
+  right:0;
+  min-width:220px;
+  background:#141416;
+  border:1.5px solid var(--gold);
+  border-radius:12px;
+  box-shadow:0 12px 36px rgba(0,0,0,0.7);
+  padding:8px;
+  z-index:40;
+  animation:navFadeIn .18s ease;
+}
+.nav-dropdown.open{display:block}
+.nav-dropdown-inner{display:flex;flex-direction:column;gap:2px}
+.nav-item{
+  display:block;
+  padding:12px 14px;
+  border-radius:8px;
+  color:#fff;
+  text-decoration:none;
+  font-weight:700;
+  font-size:.92rem;
+  text-transform:uppercase;
+  letter-spacing:.02em;
+  transition:background .15s ease, color .15s ease;
+}
+.nav-item:hover{background:var(--accent);color:#fff}
+.nav-item.active{background:var(--accent);color:#fff}
+@keyframes navFadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
 main{max-width:1400px;margin:22px auto;padding:0 18px 50px}
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
 .card{
@@ -162,6 +224,24 @@ body.is-admin div.admin-only{display:flex !important}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .kpi{background:#18181c;border:1px solid var(--gold);border-radius:11px;padding:12px;text-align:center}
 .kpi .big{font-size:1.65rem;font-weight:900;color:#fff}.kpi .small{font-size:.76rem;color:var(--gold);text-transform:uppercase}
+
+/* Standings table helpers */
+.th-sub{display:block;font-size:.62rem;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;margin-top:2px}
+.high-game-circle{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:38px;
+  height:38px;
+  padding:0 8px;
+  border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, #fff3a0, #ffd700 60%, #c9a800 100%);
+  color:#1a1200;
+  font-weight:900;
+  font-size:.92rem;
+  box-shadow:0 0 0 3px rgba(255,215,0,0.35), 0 3px 10px rgba(0,0,0,0.5);
+  border:2px solid #fff8c5;
+}
 
 /* Landing page cards */
 .landing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
